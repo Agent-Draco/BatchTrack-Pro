@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GatePass — WhatsApp Visitor Pre-Approval</title>
+<style>
+  :root{
+    --paper: #F6F2E9;
+    --card: #FFFFFF;
+    --green: #1F4D3D;
+    --green-light: #2E6B54;
+    --amber: #D98E3E;
+    --red: #A63A3A;
+    --ink: #2B2620;
+    --muted: #7C7466;
+    --line: #E3DBC9;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color: transparent; }
+  html,body{ height:100%; }
+  body{
+    background:#DCD3BE;
+    font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    color: var(--ink);
+    display:flex; justify-content:center; min-height:100vh;
+  }
+  .phone{
+    width:100%; max-width:430px; background: var(--paper);
+    min-height:100vh; position:relative; box-shadow:0 0 40px rgba(0,0,0,.25);
+    overflow:hidden;
+  }
+
+  /* Role switcher (demo-only chrome) */
+  .role-switch{
+    display:flex; background:#12332A; padding:6px; gap:6px;
+  }
+  .role-switch button{
+    flex:1; padding:9px; border:none; border-radius:8px;
+    background:transparent; color:#BFD6CC; font-size:12.5px; font-weight:600;
+    cursor:pointer; font-family:inherit;
+  }
+  .role-switch button.active{ background: var(--green-light); color:#fff; }
+
+  .app{ display:none; }
+  .app.active{ display:block; }
+  .screen{ display:none; padding-bottom:30px; min-height: calc(100vh - 46px); }
+  .screen.active{ display:block; animation: fadeIn .22s ease; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .topbar{
+    background: var(--green); color:#fff; padding:20px 20px 16px; position:relative;
+  }
+  .topbar h1{ font-size:20px; font-weight:700; }
+  .topbar .sub{ font-size:12px; color:#BFD6CC; margin-top:3px; }
+  .topbar .back{ position:absolute; left:16px; top:20px; font-size:20px; color:#fff; cursor:pointer; }
+
+  /* ---------- RESIDENT: home list ---------- */
+  .section-label{
+    padding:16px 18px 8px; font-size:12.5px; color:var(--muted); font-weight:600;
+  }
+  .pass-card{
+    margin:0 18px 12px; background:var(--card); border:1px solid var(--line);
+    border-radius:12px; padding:14px; display:flex; gap:12px; align-items:center;
+  }
+  .pass-icon{
+    width:42px; height:42px; border-radius:10px; background:#EAF2EE; color:var(--green);
+    display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;
+  }
+  .pass-body{ flex:1; }
+  .pass-name{ font-size:14.5px; font-weight:700; }
+  .pass-meta{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .status-pill{
+    font-size:10px; font-weight:700; padding:3px 9px; border-radius:10px;
+    text-transform:uppercase; letter-spacing:.3px;
+  }
+  .status-pill.active{ background:#E4F3EA; color:var(--green); }
+  .status-pill.used{ background:#EFEAE0; color:var(--muted); }
+  .status-pill.expired{ background:#F6E8E8; color:var(--red); }
+
+  .fab-wrap{ padding: 6px 18px 4px; }
+  .fab-btn{
+    width:100%; background: var(--green); color:#fff; border:none; border-radius:10px;
+    padding:14px; font-size:14.5px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+
+  /* ---------- RESIDENT: create pass ---------- */
+  .form-wrap{ padding:16px 18px; }
+  .field-label{ font-size:12.5px; font-weight:700; color:var(--ink); margin:14px 0 8px; }
+  .field-label:first-child{ margin-top:0; }
+  .chip-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .chip{
+    padding:9px 14px; border-radius:20px; border:1.5px solid var(--line);
+    background:var(--card); font-size:12.5px; cursor:pointer; color:var(--ink);
+  }
+  .chip.on{ background:var(--green); border-color:var(--green); color:#fff; }
+  .text-input{
+    width:100%; padding:12px 14px; border-radius:9px; border:1.5px solid var(--line);
+    background:var(--card); font-size:14px; font-family:inherit; color:var(--ink);
+  }
+  .text-input::placeholder{ color:#B3AA97; }
+  .preset-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .preset{
+    padding:9px 12px; border-radius:9px; border:1.5px solid var(--line);
+    background:var(--card); font-size:12px; cursor:pointer; color:var(--ink);
+  }
+  .preset.on{ background:#EAF2EE; border-color:var(--green); color:var(--green); font-weight:700; }
+  .generate-btn{
+    margin-top:22px; width:100%; background:var(--amber); color:#fff; border:none;
+    border-radius:10px; padding:14px; font-size:14.5px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+  .generate-btn:disabled{ opacity:.4; }
+
+  /* ---------- RESIDENT: pass reveal ---------- */
+  .ticket{
+    margin: 10px 18px 0; background:var(--card); border-radius:16px;
+    border:1.5px dashed var(--green-light); padding:22px 20px; text-align:center;
+    position:relative;
+  }
+  .ticket .type-badge{
+    display:inline-block; background:#EAF2EE; color:var(--green); font-size:11px;
+    font-weight:700; padding:4px 10px; border-radius:8px; margin-bottom:10px;
+  }
+  .ticket .visitor-name{ font-size:19px; font-weight:800; }
+  .ticket .visitor-sub{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+  .qr{
+    width:130px; height:130px; margin:18px auto 12px;
+    background:
+      repeating-linear-gradient(0deg, #17362B 0 6px, transparent 6px 12px),
+      repeating-linear-gradient(90deg, #17362B 0 6px, transparent 6px 12px);
+    background-blend-mode: multiply;
+    border-radius:10px; border:3px solid var(--green);
+    position:relative;
+  }
+  .qr::before{
+    content:"⌗"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:44px; color:var(--green); background: var(--card); width:44px; height:44px;
+    margin:auto; border-radius:6px;
+  }
+  .code-big{
+    font-size:30px; font-weight:800; letter-spacing:6px; color:var(--green);
+    font-family:'Courier New', monospace; margin-top:4px;
+  }
+  .validity-line{ font-size:12px; color:var(--muted); margin-top:10px; }
+  .share-btn{
+    margin:20px 18px 8px; width:calc(100% - 36px); background:#25603F; color:#fff;
+    border:none; border-radius:10px; padding:14px; font-size:14.5px; font-weight:700;
+    cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .done-btn{
+    margin: 0 18px; width:calc(100% - 36px); background:transparent; color:var(--muted);
+    border:1.5px solid var(--line); border-radius:10px; padding:12px; font-size:13.5px;
+    cursor:pointer; font-family:inherit;
+  }
+
+  .wa-preview{
+    margin: 14px 18px 0; background:#E9F5EE; border-radius:12px 12px 12px 2px;
+    padding:12px 14px; font-size:12.5px; color:#1E3327; line-height:1.5;
+  }
+  .wa-preview .wa-label{ font-size:10.5px; color:var(--muted); margin-bottom:6px; font-weight:600; }
+
+  /* ---------- GUARD: verify ---------- */
+  .verify-wrap{ padding:20px 18px; }
+  .code-display{
+    text-align:center; font-size:34px; letter-spacing:10px; font-weight:800;
+    font-family:'Courier New', monospace; color:var(--ink); min-height:44px; margin-bottom:6px;
+  }
+  .code-display.placeholder{ color:#C9BFA9; letter-spacing:6px; font-size:16px; font-weight:500; }
+  .keypad{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:18px; }
+  .key{
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:16px 0; text-align:center; font-size:19px; font-weight:700; cursor:pointer;
+  }
+  .key.func{ background:#EFEAE0; color:var(--muted); font-size:14px; }
+  .scan-link{
+    text-align:center; margin-top:16px; font-size:12.5px; color:var(--green); font-weight:600; cursor:pointer;
+  }
+  .verify-btn{
+    margin-top:18px; width:100%; background:var(--green); color:#fff; border:none;
+    border-radius:10px; padding:14px; font-size:14.5px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+  .verify-btn:disabled{ opacity:.35; }
+
+  /* ---------- GUARD: result ---------- */
+  .result-wrap{ padding:24px 20px; text-align:center; }
+  .result-badge{
+    width:74px; height:74px; border-radius:50%; margin:0 auto 14px;
+    display:flex; align-items:center; justify-content:center; font-size:34px; color:#fff;
+  }
+  .result-badge.valid{ background: var(--green); }
+  .result-badge.invalid{ background: var(--red); }
+  .result-title{ font-size:20px; font-weight:800; }
+  .result-sub{ font-size:12.5px; color:var(--muted); margin-top:4px; }
+  .visitor-detail{
+    margin:20px 0; background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:16px; text-align:left;
+  }
+  .vd-row{ display:flex; justify-content:space-between; padding:7px 0; font-size:13px; border-bottom:1px solid var(--line); }
+  .vd-row:last-child{ border-bottom:none; }
+  .vd-row .k{ color:var(--muted); }
+  .vd-row .v{ font-weight:700; }
+  .allow-btn{
+    width:100%; background:var(--green); color:#fff; border:none; border-radius:10px;
+    padding:14px; font-size:14.5px; font-weight:700; cursor:pointer; margin-bottom:10px; font-family:inherit;
+  }
+  .deny-btn{
+    width:100%; background:transparent; color:var(--red); border:1.5px solid var(--red);
+    border-radius:10px; padding:12px; font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+  .retry-btn{
+    width:100%; background:transparent; color:var(--muted); border:1.5px solid var(--line);
+    border-radius:10px; padding:12px; font-size:13.5px; cursor:pointer; font-family:inherit; margin-top:4px;
+  }
+
+  /* ---------- GUARD: register log ---------- */
+  .log-entry{
+    margin:0 18px 10px; background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; display:flex; align-items:center; gap:10px;
+  }
+  .log-time{ font-size:11px; color:var(--muted); font-family:'Courier New', monospace; width:44px; flex-shrink:0; }
+  .log-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .log-dot.entered{ background: var(--green); }
+  .log-dot.denied{ background: var(--red); }
+  .log-body{ flex:1; }
+  .log-name{ font-size:13px; font-weight:700; }
+  .log-sub{ font-size:11px; color:var(--muted); }
+
+  .toast{
+    position:fixed; top:16px; left:50%; transform:translateX(-50%);
+    background: var(--green); color:#fff; padding:10px 18px; border-radius:20px;
+    font-size:12.5px; z-index:100; opacity:0; pointer-events:none; transition:opacity .3s, top .3s;
+  }
+  .toast.show{ opacity:1; top:26px; }
+
+  .tabbar{
+    display:flex; border-top:1px solid var(--line); background:var(--card);
+  }
+  .tabbar button{
+    flex:1; padding:12px 0 10px; background:none; border:none; font-size:11px; color:var(--muted);
+    cursor:pointer; font-family:inherit;
+  }
+  .tabbar button.active{ color:var(--green); font-weight:700; }
+  .tabbar .ic{ display:block; font-size:17px; margin-bottom:2px; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="role-switch">
+    <button class="active" onclick="switchRole('resident')">📱 Resident view</button>
+    <button onclick="switchRole('guard')">🛡️ Guard view</button>
+  </div>
+
+  <!-- ===================== RESIDENT APP ===================== -->
+  <div class="app active" id="app-resident">
+
+    <div class="screen active" id="r-home">
+      <div class="topbar">
+        <h1>GatePass</h1>
+        <div class="sub">B-Block, Sunview Residency · Flat 402</div>
+      </div>
+      <div class="section-label">Active passes</div>
+      <div id="r-list"></div>
+      <div class="fab-wrap">
+        <button class="fab-btn" onclick="openCreate()">+ Create a new pass</button>
+      </div>
+    </div>
+
+    <div class="screen" id="r-create">
+      <div class="topbar">
+        <span class="back" onclick="showScreen('r-home')">←</span>
+        <h1>New pass</h1>
+        <div class="sub">Valid only for the window you set</div>
+      </div>
+      <div class="form-wrap">
+        <div class="field-label">Who's visiting?</div>
+        <div class="chip-row" id="typeChips">
+          <div class="chip" data-t="Delivery">📦 Delivery</div>
+          <div class="chip" data-t="Guest">👤 Guest</div>
+          <div class="chip" data-t="Cab">🚗 Cab / Auto</div>
+          <div class="chip" data-t="Help">🧹 Domestic help</div>
+        </div>
+
+        <div class="field-label">Name / company</div>
+        <input class="text-input" id="visitorName" placeholder="e.g. Zomato — Ramesh, or Rina's cab">
+
+        <div class="field-label">Valid for</div>
+        <div class="preset-row" id="presetRow">
+          <div class="preset" data-p="Next 2 hours">Next 2 hours</div>
+          <div class="preset" data-p="Today only">Today only</div>
+          <div class="preset" data-p="This weekend">This weekend</div>
+          <div class="preset" data-p="One-time entry">One-time entry</div>
+        </div>
+
+        <button class="generate-btn" id="genBtn" disabled onclick="generatePass()">Generate pass</button>
+      </div>
+    </div>
+
+    <div class="screen" id="r-reveal">
+      <div class="topbar">
+        <span class="back" onclick="showScreen('r-home')">←</span>
+        <h1>Pass ready</h1>
+        <div class="sub">Share the code — guard verifies at the gate</div>
+      </div>
+      <div class="ticket">
+        <div class="type-badge" id="rv-type"></div>
+        <div class="visitor-name" id="rv-name"></div>
+        <div class="visitor-sub" id="rv-sub"></div>
+        <div class="qr"></div>
+        <div class="code-big" id="rv-code"></div>
+        <div class="validity-line" id="rv-validity"></div>
+      </div>
+      <div class="wa-preview">
+        <div class="wa-label">Message that gets sent on WhatsApp</div>
+        <div id="wa-text"></div>
+      </div>
+      <button class="share-btn" onclick="shareWA()">💬 Share via WhatsApp</button>
+      <div style="height:10px"></div>
+      <button class="done-btn" onclick="finishReveal()">Done</button>
+    </div>
+
+    <div class="tabbar">
+      <button class="active"><span class="ic">🏠</span>Home</button>
+      <button><span class="ic">📜</span>History</button>
+      <button><span class="ic">⚙️</span>Settings</button>
+    </div>
+  </div>
+
+  <!-- ===================== GUARD APP ===================== -->
+  <div class="app" id="app-guard">
+
+    <div class="screen active" id="g-verify">
+      <div class="topbar">
+        <h1>Gate Desk</h1>
+        <div class="sub">Sunview Residency · Main Gate</div>
+      </div>
+      <div class="verify-wrap">
+        <div class="field-label" style="margin-top:0">Enter visitor code</div>
+        <div class="code-display placeholder" id="g-code-display">— — — —</div>
+        <div class="keypad" id="keypad"></div>
+        <div class="scan-link">📷 or scan the visitor's QR instead</div>
+        <button class="verify-btn" id="verifyBtn" disabled onclick="verifyCode()">Verify</button>
+      </div>
+      <div class="section-label">Today's register</div>
+      <div id="g-log"></div>
+    </div>
+
+    <div class="screen" id="g-result">
+      <div class="topbar">
+        <span class="back" onclick="backToVerify()">←</span>
+        <h1>Verification result</h1>
+      </div>
+      <div class="result-wrap">
+        <div class="result-badge" id="res-badge"></div>
+        <div class="result-title" id="res-title"></div>
+        <div class="result-sub" id="res-sub"></div>
+
+        <div class="visitor-detail" id="res-detail"></div>
+
+        <div id="res-actions"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- shared state ---------------- */
+let passes = [
+  {code:"7241", type:"Delivery", label:"📦 Delivery", name:"Swiggy — Anand", flat:"402", resident:"Mrs. Kavya Rao", validity:"Today only", status:"active", created:"9:10 AM"},
+  {code:"5893", type:"Guest", label:"👤 Guest", name:"Priya & family", flat:"402", resident:"Mrs. Kavya Rao", validity:"This weekend", status:"active", created:"Yesterday"},
+  {code:"1102", type:"Cab", label:"🚗 Cab / Auto", name:"Uber — KA05 AB 1234", flat:"402", resident:"Mrs. Kavya Rao", validity:"Next 2 hours", status:"used", created:"Mon, 6:40 PM"}
+];
+let log = [
+  {time:"9:14 AM", name:"Swiggy — Anand", flat:"402", status:"entered"},
+  {time:"8:02 AM", name:"Milk delivery", flat:"301", status:"entered"},
+  {time:"7:45 AM", name:"Unknown — no code", flat:"—", status:"denied"}
+];
+
+let selectedType = null;
+let selectedPreset = null;
+let pendingCode = "";
+let lastGenerated = null;
+
+/* ---------------- role switch ---------------- */
+function switchRole(role){
+  document.querySelectorAll('.role-switch button').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('app-resident').classList.toggle('active', role==='resident');
+  document.getElementById('app-guard').classList.toggle('active', role==='guard');
+  if(role==='guard') renderLog();
+}
+
+function showScreen(id){
+  const app = id.startsWith('r-') ? 'app-resident' : 'app-guard';
+  document.querySelectorAll('#'+app+' .screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ---------------- RESIDENT: home ---------------- */
+function renderResidentList(){
+  const list = document.getElementById('r-list');
+  if(passes.length===0){
+    list.innerHTML = '<div style="padding:20px 18px;color:var(--muted);font-size:12.5px;">No passes yet. Create one for your next delivery or guest.</div>';
+    return;
+  }
+  list.innerHTML = passes.slice().reverse().map(p=>`
+    <div class="pass-card">
+      <div class="pass-icon">${p.label.split(' ')[0]}</div>
+      <div class="pass-body">
+        <div class="pass-name">${p.name}</div>
+        <div class="pass-meta">Code ${p.code} · ${p.validity} · ${p.created}</div>
+      </div>
+      <div class="status-pill ${p.status}">${p.status}</div>
+    </div>
+  `).join('');
+}
+
+/* ---------------- RESIDENT: create ---------------- */
+function openCreate(){
+  selectedType = null; selectedPreset = null;
+  document.querySelectorAll('#typeChips .chip').forEach(c=>c.classList.remove('on'));
+  document.querySelectorAll('#presetRow .preset').forEach(c=>c.classList.remove('on'));
+  document.getElementById('visitorName').value = '';
+  document.getElementById('genBtn').disabled = true;
+  showScreen('r-create');
+}
+
+document.getElementById('typeChips').addEventListener('click', e=>{
+  const chip = e.target.closest('.chip'); if(!chip) return;
+  document.querySelectorAll('#typeChips .chip').forEach(c=>c.classList.remove('on'));
+  chip.classList.add('on');
+  selectedType = chip.dataset.t;
+  checkFormReady();
+});
+document.getElementById('presetRow').addEventListener('click', e=>{
+  const p = e.target.closest('.preset'); if(!p) return;
+  document.querySelectorAll('#presetRow .preset').forEach(c=>c.classList.remove('on'));
+  p.classList.add('on');
+  selectedPreset = p.dataset.p;
+  checkFormReady();
+});
+document.getElementById('visitorName').addEventListener('input', checkFormReady);
+
+function checkFormReady(){
+  const name = document.getElementById('visitorName').value.trim();
+  document.getElementById('genBtn').disabled = !(selectedType && selectedPreset && name.length>0);
+}
+
+function generatePass(){
+  const name = document.getElementById('visitorName').value.trim();
+  const code = String(Math.floor(1000 + Math.random()*8999));
+  const chipLabels = {Delivery:"📦 Delivery", Guest:"👤 Guest", Cab:"🚗 Cab / Auto", Help:"🧹 Domestic help"};
+  const pass = {
+    code, type:selectedType, label:chipLabels[selectedType], name,
+    flat:"402", resident:"Mrs. Kavya Rao", validity:selectedPreset,
+    status:"active", created:"Just now"
+  };
+  passes.push(pass);
+  lastGenerated = pass;
+
+  document.getElementById('rv-type').textContent = chipLabels[selectedType];
+  document.getElementById('rv-name').textContent = name;
+  document.getElementById('rv-sub').textContent = "Flat 402 · Sunview Residency";
+  document.getElementById('rv-code').textContent = code;
+  document.getElementById('rv-validity').textContent = "Valid: " + selectedPreset;
+  document.getElementById('wa-text').textContent =
+    `🔐 GatePass for ${name}\nCode: ${code}\nFlat 402, Sunview Residency\nValid: ${selectedPreset}\nShow this to the guard at the gate.`;
+
+  renderResidentList();
+  showScreen('r-reveal');
+}
+
+function shareWA(){
+  showToast('Opening WhatsApp to share the pass…');
+}
+function finishReveal(){
+  renderResidentList();
+  showScreen('r-home');
+}
+
+/* ---------------- GUARD: keypad ---------------- */
+function renderKeypad(){
+  const keys = ["1","2","3","4","5","6","7","8","9","⌫","0","⏎"];
+  document.getElementById('keypad').innerHTML = keys.map(k=>{
+    const isFunc = (k==="⌫"||k==="⏎");
+    return `<div class="key ${isFunc?'func':''}" data-k="${k}">${k}</div>`;
+  }).join('');
+}
+document.getElementById('keypad').addEventListener('click', e=>{
+  const key = e.target.closest('.key'); if(!key) return;
+  const k = key.dataset.k;
+  if(k==="⌫"){ pendingCode = pendingCode.slice(0,-1); }
+  else if(k==="⏎"){ if(pendingCode.length===4) verifyCode(); return; }
+  else if(pendingCode.length<4){ pendingCode += k; }
+  updateCodeDisplay();
+});
+function updateCodeDisplay(){
+  const el = document.getElementById('g-code-display');
+  if(pendingCode.length===0){
+    el.textContent = "— — — —"; el.classList.add('placeholder');
+  } else {
+    el.textContent = pendingCode.padEnd(4,'·').split('').join(' ');
+    el.classList.remove('placeholder');
+  }
+  document.getElementById('verifyBtn').disabled = pendingCode.length!==4;
+}
+
+function verifyCode(){
+  const match = passes.find(p=>p.code===pendingCode);
+  const badge = document.getElementById('res-badge');
+  const title = document.getElementById('res-title');
+  const sub = document.getElementById('res-sub');
+  const detail = document.getElementById('res-detail');
+  const actions = document.getElementById('res-actions');
+
+  if(match && match.status==='active'){
+    badge.className = 'result-badge valid'; badge.textContent = '✓';
+    title.textContent = 'Valid pass';
+    sub.textContent = 'Approved by resident — safe to let in';
+    detail.innerHTML = `
+      <div class="vd-row"><span class="k">Visitor</span><span class="v">${match.name}</span></div>
+      <div class="vd-row"><span class="k">Type</span><span class="v">${match.label}</span></div>
+      <div class="vd-row"><span class="k">Flat</span><span class="v">${match.flat} — ${match.resident}</span></div>
+      <div class="vd-row"><span class="k">Valid</span><span class="v">${match.validity}</span></div>
+    `;
+    actions.innerHTML = `
+      <button class="allow-btn" onclick="logEntry('${match.name}','${match.flat}','entered', '${match.code}')">Allow entry & log</button>
+      <button class="deny-btn" onclick="logEntry('${match.name}','${match.flat}','denied', '${match.code}')">Deny anyway</button>
+    `;
+  } else if(match && match.status!=='active'){
+    badge.className = 'result-badge invalid'; badge.textContent = '!';
+    title.textContent = 'Code already used';
+    sub.textContent = 'This pass was already checked in once';
+    detail.innerHTML = `
+      <div class="vd-row"><span class="k">Visitor</span><span class="v">${match.name}</span></div>
+      <div class="vd-row"><span class="k">Flat</span><span class="v">${match.flat}</span></div>
+      <div class="vd-row"><span class="k">Status</span><span class="v">${match.status}</span></div>
+    `;
+    actions.innerHTML = `
+      <button class="deny-btn" onclick="logEntry('${match.name}','${match.flat}','denied','${match.code}')">Deny entry</button>
+      <button class="retry-btn" onclick="backToVerify()">Try another code</button>
+    `;
+  } else {
+    badge.className = 'result-badge invalid'; badge.textContent = '✕';
+    title.textContent = 'No matching pass';
+    sub.textContent = 'Ask visitor to confirm the code with the resident';
+    detail.innerHTML = `<div class="vd-row"><span class="k">Code entered</span><span class="v">${pendingCode}</span></div>`;
+    actions.innerHTML = `
+      <button class="deny-btn" onclick="logEntry('Unknown — no code','—','denied','')">Log as denied</button>
+      <button class="retry-btn" onclick="backToVerify()">Try another code</button>
+    `;
+  }
+  showScreen('g-result');
+}
+
+function logEntry(name, flat, status, code){
+  const now = new Date();
+  const h = now.getHours()%12 || 12;
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const ampm = now.getHours()>=12 ? 'PM':'AM';
+  log.unshift({time:`${h}:${m} ${ampm}`, name, flat, status});
+
+  if(code){
+    const p = passes.find(pp=>pp.code===code);
+    if(p) p.status = 'used';
+  }
+  renderResidentList();
+  backToVerify();
+  showToast(status==='entered' ? 'Entry logged ✓' : 'Marked as denied');
+}
+
+function backToVerify(){
+  pendingCode = "";
+  updateCodeDisplay();
+  renderLog();
+  showScreen('g-verify');
+}
+
+function renderLog(){
+  document.getElementById('g-log').innerHTML = log.map(l=>`
+    <div class="log-entry">
+      <div class="log-time">${l.time}</div>
+      <div class="log-dot ${l.status}"></div>
+      <div class="log-body">
+        <div class="log-name">${l.name}</div>
+        <div class="log-sub">Flat ${l.flat}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ---------------- toast ---------------- */
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ---------------- init ---------------- */
+renderResidentList();
+renderKeypad();
+updateCodeDisplay();
+renderLog();
+</script>
+
+</body>
+</html>
