@@ -1,45 +1,35 @@
 (function (global) {
   'use strict';
 
-  const DB_NAME = 'batchtrack_local_db';
-  const DB_VERSION = 1;
-  const TABLES = ['retailers', 'consumers', 'machines', 'inventory', 'transactions', 'sessions'];
+  const DB_NAME = 'batchtrack_supabase';
+  const DB_VERSION = 3;
+  const TABLES = [
+    'retailers',
+    'consumers',
+    'machines',
+    'inventory',
+    'transactions',
+    'documents',
+    'credit_notes',
+    'support_tickets',
+    'sessions'
+  ];
   let connectionPromise = null;
 
   function open() {
     if (connectionPromise) return connectionPromise;
 
-    connectionPromise = new Promise((resolve, reject) => {
-      if (!global.indexedDB) {
-        reject(new Error('IndexedDB is not available in this browser.'));
-        return;
+    connectionPromise = Promise.resolve().then(() => {
+      const config = global.BATCHTRACK_SUPABASE_CONFIG || {};
+      if (!global.supabase?.createClient || !config.url || !config.anonKey) {
+        throw new Error('Supabase client configuration is missing.');
       }
-
-      const request = global.indexedDB.open(DB_NAME, DB_VERSION);
-      request.onupgradeneeded = function () {
-        const db = request.result;
-        TABLES.forEach((table) => {
-          if (!db.objectStoreNames.contains(table)) {
-            db.createObjectStore(table, { keyPath: 'id' });
-          }
-        });
-      };
-      request.onsuccess = function () {
-        const db = request.result;
-        db.onversionchange = function () {
-          db.close();
-          connectionPromise = null;
-        };
-        resolve(db);
-      };
-      request.onerror = function () {
-        connectionPromise = null;
-        reject(request.error || new Error('Unable to open the local database.'));
-      };
-      request.onblocked = function () {
-        connectionPromise = null;
-        reject(new Error('The local database is blocked by another browser tab.'));
-      };
+      return global.supabase.createClient(config.url, config.anonKey, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      });
+    }).catch((error) => {
+      connectionPromise = null;
+      throw error;
     });
 
     return connectionPromise;
@@ -53,33 +43,27 @@
 
   async function read(table) {
     assertTable(table);
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const request = db.transaction(table, 'readonly').objectStore(table).getAll();
-      request.onsuccess = () => resolve(request.result || []);
-      request.onerror = () => reject(request.error || new Error(`Unable to read ${table}.`));
-    });
+    const client = await open();
+    const { data, error } = await client.from(table).select('record').order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data || []).map((row) => row.record);
   }
 
   async function put(table, record) {
     assertTable(table);
     if (!record || !record.id) throw new Error(`A record id is required for ${table}.`);
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const request = db.transaction(table, 'readwrite').objectStore(table).put(record);
-      request.onsuccess = () => resolve(record);
-      request.onerror = () => reject(request.error || new Error(`Unable to write ${table}.`));
-    });
+    const client = await open();
+    const { error } = await client.from(table).upsert({ id: String(record.id), record, updated_at: new Date().toISOString() });
+    if (error) throw error;
+    return record;
   }
 
   async function remove(table, id) {
     assertTable(table);
-    const db = await open();
-    return new Promise((resolve, reject) => {
-      const request = db.transaction(table, 'readwrite').objectStore(table).delete(id);
-      request.onsuccess = () => resolve(true);
-      request.onerror = () => reject(request.error || new Error(`Unable to delete from ${table}.`));
-    });
+    const client = await open();
+    const { error } = await client.from(table).delete().eq('id', String(id));
+    if (error) throw error;
+    return true;
   }
 
   async function find(table, predicate) {

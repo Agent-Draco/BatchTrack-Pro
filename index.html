@@ -172,6 +172,14 @@
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bwip-js@4.5.1/dist/bwip-js-min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      // The anon key is designed for browser use; database access is enforced by Supabase RLS.
+      window.BATCHTRACK_SUPABASE_CONFIG = {
+        url: 'https://bwiytslmkiyzdaijjtka.supabase.co',
+          anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJid2l5dHNsbWtpeXpkYWlqdGthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNDcxOTYsImV4cCI6MjEwNDYyMzE5Nn0.Rke5rXqI5bS9lRbwsW5lXLyCWe2qhWkY6-pCMZqbM6o'
+      };
+    </script>
     <script src="./database/local-db.js"></script>
     <script type="module">
       window.zxingReady = import('https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm')
@@ -194,6 +202,9 @@
           transactions: [],
           consumers: [],
           machines: [],
+          documents: [],
+          creditNotes: [],
+          supportTickets: [],
           scanTarget: null,
           scannerActive: false,
           toastTimer: null
@@ -262,18 +273,64 @@
         }
 
         async function loadAllData() {
-          const [retailers, consumers, machines, inventory, transactions] = await Promise.all([
+          const [retailers, consumers, machines, inventory, transactions, documents, creditNotes, supportTickets] = await Promise.all([
             readTable('retailers'),
             readTable('consumers'),
             readTable('machines'),
             readTable('inventory'),
-            readTable('transactions')
+            readTable('transactions'),
+            readTable('documents'),
+            readTable('credit_notes'),
+            readTable('support_tickets')
           ]);
           state.retailers = retailers;
           state.consumers = consumers;
           state.machines = machines;
           state.inventory = inventory;
           state.transactions = transactions;
+          state.documents = documents;
+          state.creditNotes = creditNotes;
+          state.supportTickets = supportTickets;
+        }
+
+        const TRACKLY_CATEGORIES = ['pharma', 'consumables', 'electronics'];
+
+        function normalizeCategory(value) {
+          const normalized = String(value || '').trim().toLowerCase();
+          if (normalized.includes('pharm') || normalized.includes('medic')) return 'pharma';
+          if (normalized.includes('elect') || normalized.includes('gadget') || normalized.includes('device')) return 'electronics';
+          if (normalized.includes('consum') || normalized.includes('food') || normalized.includes('grocery')) return 'consumables';
+          return TRACKLY_CATEGORIES.includes(normalized) ? normalized : 'consumables';
+        }
+
+        function parseAztecPayload(text) {
+          const parts = String(text || '').trim().split('|');
+          if (parts[0] !== 'AZT' || parts.length < 7) return null;
+          return {
+            wadn: parts[1],
+            category: normalizeCategory(parts[2]),
+            batchNumber: parts[3],
+            price: Number(parts[4]) || 0,
+            expiry: parts[5],
+            warrantyMonths: Number(parts[6]) || 0
+          };
+        }
+
+        function warrantyExpiry(item, fromDate = new Date()) {
+          const start = new Date(item.mfgDate || item.purchaseDate || fromDate);
+          const months = Number(item.warrantyMonths || item.warranty || 0);
+          if (!months || Number.isNaN(start.getTime())) return '';
+          const expiry = new Date(start);
+          expiry.setMonth(expiry.getMonth() + months);
+          return expiry.toISOString().slice(0, 10);
+        }
+
+        function aztecPayload(item) {
+          return ['AZT', item.wadn, normalizeCategory(item.category), item.batchNumber, Number(item.price || 0), item.expiry || '', Number(item.warrantyMonths || 0)].join('|');
+        }
+
+        function qrPayload(item) {
+          return JSON.stringify({ wadn: item.wadn, batch: item.batchNumber, cat: normalizeCategory(item.category), exp: item.expiry || '' });
         }
 
         function renderLanding() {
@@ -663,6 +720,7 @@
                   <button type="button" data-action="retail-inventory">Inventory</button>
                   <button type="button" data-action="retail-profile">Profile</button>
                   <button type="button" data-action="retail-billing">Billing machine</button>
+                  <button type="button" data-action="retail-tickets">Tickets</button>
                   <button type="button" data-action="logout">Logout</button>
                 </div>
               </nav>
@@ -684,7 +742,7 @@
                     <input id="inventory-upload" class="hidden" type="file" accept=".csv,.xlsx,.xls" />
                     <div class="schema-box">
                       <strong>Upload schema: starts reading from row 2</strong>
-                      <code>Batch number | Quantity | Price | Expiry | Warranty | Mfg date | Mfg place | Warranty number</code>
+                      <code>Batch Number | Quantity | Price | Expiry | Warranty Months | Mfg Date | Category | WADN</code>
                     </div>
                     <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">
                       <button id="generate-qr-pdf" class="btn success" type="button">Generate QR + Aztec PDF</button>
@@ -757,12 +815,13 @@
         function renderRetailerPage(retailer, page) {
           const inventory = state.inventory.filter((item) => item.retailerId === retailer.id);
           const machines = state.machines.filter((item) => item.retailerId === retailer.id);
-          const pageTitle = page === 'inventory' ? 'Inventory' : page === 'profile' ? 'Retailer profile' : 'Billing machines';
+          const pageTitle = page === 'inventory' ? 'Inventory' : page === 'profile' ? 'Retailer profile' : page === 'tickets' ? 'Incoming support tickets' : 'Billing machines';
           const pageIntro = page === 'inventory'
             ? 'Upload stock records, print QR labels, and inspect the batches held by this store.'
             : page === 'profile'
               ? 'Manage the store identity and the reward rule applied to every completed sale.'
-              : 'Create and manage the billing stations connected to this retailer account.';
+              : page === 'tickets' ? 'Review customer issues alongside the verified RAD history for each WADN.'
+                : 'Create and manage the billing stations connected to this retailer account.';
 
           appNode.innerHTML = `
             <div class="app-shell">
@@ -774,6 +833,7 @@
                   <button type="button" data-action="retail-inventory">Inventory</button>
                   <button type="button" data-action="retail-profile">Profile</button>
                   <button type="button" data-action="retail-billing">Billing machine</button>
+                  <button type="button" data-action="retail-tickets">Tickets</button>
                   <button type="button" data-action="logout">Logout</button>
                 </div>
               </nav>
@@ -794,7 +854,7 @@
                     <input id="inventory-upload" class="hidden" type="file" accept=".csv,.xlsx,.xls" />
                     <div class="schema-box">
                       <strong>Upload schema: starts reading from row 2</strong>
-                      <code>Batch number | Quantity | Price | Expiry | Warranty | Mfg date | Mfg place | Warranty number</code>
+                      <code>Batch Number | Quantity | Price | Expiry | Warranty Months | Mfg Date | Category | WADN</code>
                     </div>
                     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
                       <button id="generate-qr-pdf" class="btn success" type="button">Generate QR + Aztec PDF</button>
@@ -834,6 +894,15 @@
                       <div class="field"><label>Fixed credit</label><input id="reward-fixed" type="number" value="${retailer.rewards?.fixedCredit ?? 25}" min="0" step="1" /></div>
                       <button id="save-reward-settings" class="btn primary" type="button" style="width:100%;">Save reward settings</button>
                     </div>
+                  </div>
+                ` : page === 'tickets' ? `
+                  <div class="section">
+                    <div class="section-head"><h3>RAD-linked service queue</h3><span class="pill blue">${state.supportTickets.filter((ticket) => ticket.retailerId === retailer.id).length} tickets</span></div>
+                    <div class="list">${state.supportTickets.filter((ticket) => ticket.retailerId === retailer.id).map((ticket) => {
+                      const documentMatch = state.documents.find((doc) => doc.retailerId === retailer.id && (doc.radDossiers || []).some((rad) => rad.wadn === ticket.wadn));
+                      const rad = documentMatch?.radDossiers?.find((entry) => entry.wadn === ticket.wadn);
+                      return `<div class="row-item"><div><strong>${escapeHtml(ticket.wadn || 'Unknown WADN')}</strong><div class="tiny">${escapeHtml(ticket.category)} · ${escapeHtml(ticket.description)} · ${escapeHtml(ticket.consumerPhone)}</div><div class="tiny">RAD: ${escapeHtml(rad?.verificationStatus || 'No official RAD match')}</div></div><span class="pill ${ticket.status === 'open' ? 'red' : 'green'}">${escapeHtml(ticket.status)}</span></div>`;
+                    }).join('') || '<div class="tiny">No incoming service tickets.</div>'}</div>
                   </div>
                 ` : `
                   <div class="section">
@@ -929,24 +998,26 @@
               const quantity = Number(String(row[1] ?? '0').replace(/[^0-9.]/g, '')) || 0;
               const price = Number(String(row[2] ?? '0').replace(/[^0-9.]/g, '')) || 0;
               const expiry = String(row[3] ?? '').trim();
-              const warranty = String(row[4] ?? '').trim();
+              const warrantyMonths = Number(String(row[4] ?? '0').replace(/[^0-9.]/g, '')) || 0;
               const mfgDate = String(row[5] ?? '').trim();
-              const mfgPlace = String(row[6] ?? '').trim();
-              const warrantyNumber = String(row[7] ?? '').trim();
+              const category = normalizeCategory(row[6]);
+              const wadn = String(row[7] ?? '').trim() || `WADN-${batchNumber || 'ITEM'}-${String(index + 1).padStart(3, '0')}`;
               return {
                 id: uid(),
                 retailerId: retailer.id,
                 batchNumber,
+                wadn,
+                category,
                 productName: batchNumber || `Inventory-${index + 1}`,
                 quantity,
                 price,
                 expiry,
-                warranty,
+                warrantyMonths,
+                warranty: warrantyMonths,
                 mfgDate,
-                mfgPlace,
-                warrantyNumber,
                 createdAt: new Date().toISOString(),
-                qrPayload: JSON.stringify({ batch: batchNumber, retailer: retailer.id, type: 'inventory' })
+                qrPayload: qrPayload({ wadn, batchNumber, category, expiry }),
+                aztecPayload: aztecPayload({ wadn, category, batchNumber, price, expiry, warrantyMonths })
               };
             }).filter((item) => item.batchNumber);
 
@@ -994,7 +1065,7 @@
           });
         }
 
-        async function startQrScanner() {
+        async function startQrScanner(onScan) {
           const modal = document.createElement('div');
           modal.className = 'scanner-modal active';
           modal.innerHTML = `
@@ -1023,6 +1094,19 @@
           modal.querySelector('[data-close-scanner]').addEventListener('click', close);
           const handleDecodedText = (text, format) => {
             if (closed || !text) return;
+            const aztec = parseAztecPayload(text);
+            if (aztec) {
+              close();
+              if (onScan) {
+                onScan(aztec, text);
+                return;
+              }
+              state.scanTarget = aztec.batchNumber;
+              const batchInput = document.getElementById('machine-batch');
+              if (batchInput) batchInput.value = aztec.batchNumber;
+              showToast(`Aztec matched: ${aztec.wadn}`);
+              return;
+            }
             let payload;
             try {
               payload = JSON.parse(text);
@@ -1034,6 +1118,11 @@
               return;
             }
             state.scanTarget = payload.batch;
+            if (onScan) {
+              close();
+              onScan({ wadn: payload.wadn || '', batchNumber: payload.batch, category: normalizeCategory(payload.cat), expiry: payload.exp || '', price: Number(payload.price || 0), warrantyMonths: Number(payload.warrantyMonths || 0) }, text);
+              return;
+            }
             const item = state.inventory.find((entry) => entry.batchNumber === payload.batch || entry.id === payload.batch);
             close();
             const batchInput = document.getElementById('machine-batch');
@@ -1089,31 +1178,29 @@
           const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
           const pageWidth = pdf.internal.pageSize.getWidth();
           const safeX = 12;
-          const itemWidth = 42;
+          const itemWidth = 58;
           const itemHeight = 52;
           let x = 14;
           let y = 18;
 
           for (let i = 0; i < items.length; i += 1) {
             const item = items[i];
-            const payload = item.qrPayload || JSON.stringify({ batch: item.batchNumber, retailer: retailer.id, type: 'inventory' });
-            const qrDataUrl = await QRCode.toDataURL(payload, { width: 240, margin: 1 });
+            const qrDataUrl = await QRCode.toDataURL(qrPayload(item), { width: 240, margin: 1 });
             const aztecCanvas = document.createElement('canvas');
-            bwipjs.toCanvas(aztecCanvas, { bcid: 'azteccode', text: payload, scale: 3, padding: 2, includetext: false });
+            bwipjs.toCanvas(aztecCanvas, { bcid: 'azteccode', text: aztecPayload(item), scale: 3, padding: 2, includetext: false });
             const aztecDataUrl = aztecCanvas.toDataURL('image/png');
-            const initials = (item.productName || item.batchNumber || 'ITEM').split(/\s+/).slice(0, 3).map((part) => part[0]).join('').toUpperCase().slice(0, 2);
 
-            pdf.addImage(qrDataUrl, 'PNG', x, y, 30, 30);
-            pdf.addImage(aztecDataUrl, 'PNG', x + 31, y, 18, 18);
-            pdf.setFillColor(242, 246, 255);
-            pdf.roundedRect(x + 22, y + 2, 10, 8, 2, 2, 'F');
+            pdf.addImage(aztecDataUrl, 'PNG', x, y, 25, 25);
+            pdf.addImage(qrDataUrl, 'PNG', x + 27, y, 25, 25);
             pdf.setFontSize(8);
             pdf.setTextColor(17, 32, 51);
-            pdf.text(initials, x + 27, y + 7, { align: 'center' });
+            pdf.text('AZTEC', x + 12.5, y + 29, { align: 'center' });
+            pdf.text('QR', x + 39.5, y + 29, { align: 'center' });
             pdf.setFontSize(7);
-            pdf.text('QR + AZTEC', x, y + 36, { maxWidth: 30 });
-            pdf.text(item.batchNumber.slice(0, 18), x, y + 42, { maxWidth: 38 });
-            pdf.text((item.quantity || 0) + ' qty', x, y + 48, { maxWidth: 30 });
+            pdf.text(`WADN: ${(item.wadn || '').slice(0, 18)}`, x, y + 36, { maxWidth: 54 });
+            pdf.text(`Category: ${normalizeCategory(item.category)}`, x, y + 41, { maxWidth: 54 });
+            pdf.text(`Batch: ${(item.batchNumber || '').slice(0, 16)}`, x, y + 46, { maxWidth: 54 });
+            pdf.text(`Expiry: ${item.expiry || '—'}`, x, y + 51, { maxWidth: 54 });
 
             if ((i + 1) % 4 === 0) {
               x = 14;
@@ -1142,7 +1229,17 @@
 
         function renderConsumerDashboard(consumer) {
           const consumerTransactions = state.transactions.filter((item) => item.consumerPhone === consumer.phone);
+          const ownedItems = Array.isArray(consumer.tracklyItems) ? consumer.tracklyItems : consumerTransactions.flatMap((tx) => (tx.items || []).map((item) => ({ ...item, retailerId: tx.retailerId, retailerName: tx.retailerName, purchaseDate: tx.createdAt })));
           const totalCredit = consumer.credits || 0;
+          const categoryView = (category) => ownedItems.filter((item) => normalizeCategory(item.category) === category).map((item) => {
+            const daysToExpiry = item.expiry ? Math.ceil((new Date(item.expiry) - new Date()) / 86400000) : null;
+            const warranty = Number(item.warrantyMonths || 0);
+            const ticketButton = category === 'electronics' || category === 'pharma' ? `<button class="btn" type="button" data-service-wadn="${escapeHtml(item.wadn || '')}">Request Service</button>` : '';
+            const detail = category === 'pharma' ? `Batch safety verification: <span class="pill green">DCGI status pending review</span> ${daysToExpiry === null ? '' : `<span class="pill ${daysToExpiry <= 0 ? 'red' : 'blue'}">${daysToExpiry <= 0 ? 'Expired' : `${daysToExpiry} days left`}</span>`}`
+              : category === 'consumables' ? `Freshness window: ${escapeHtml(item.expiry || 'Not recorded')} <span class="pill ${daysToExpiry !== null && daysToExpiry <= 15 ? 'red' : 'green'}">${daysToExpiry !== null && daysToExpiry <= 15 ? '15-day prompt' : 'Monitored'}</span>`
+                : `Warranty: ${warranty} months remaining <span class="pill green">WADN verified</span>`;
+            return `<div class="row-item"><div><strong>${escapeHtml(item.wadn || item.batchNumber || 'Tracked item')}</strong><div class="tiny">Batch ${escapeHtml(item.batchNumber || '—')} · ${detail}</div></div>${ticketButton}</div>`;
+          }).join('') || '<div class="tiny">No items in this category yet.</div>';
           appNode.innerHTML = `
             <div class="app-shell">
               <nav class="nav">
@@ -1150,7 +1247,7 @@
                 <div class="nav-links">
                   ${modeControl()}
                   <button type="button" data-action="consumer-home">Overview</button>
-                  <button type="button" data-action="consumer-scan">Scan item</button>
+                  <button type="button" data-action="consumer-scan">Scan Aztec</button>
                   <button type="button" data-action="logout">Logout</button>
                 </div>
               </nav>
@@ -1164,7 +1261,11 @@
 
                 <div class="workspace">
                   <div class="section">
-                    <div class="section-head"><h3>Purchase ledger</h3></div>
+                    <div class="section-head"><h3>Trackly ownership</h3><button type="button" class="btn primary" data-action="consumer-scan">Scan Aztec</button></div>
+                    <div class="schema-box"><strong>Consumables</strong><div class="list">${categoryView('consumables')}</div></div>
+                    <div class="schema-box"><strong>Pharma</strong><div class="list">${categoryView('pharma')}</div></div>
+                    <div class="schema-box"><strong>Electronics</strong><div class="list">${categoryView('electronics')}</div></div>
+                    <div class="section-head" style="margin-top:20px;"><h3>Purchase ledger</h3></div>
                     <div class="table-wrap">
                       <table>
                         <thead>
@@ -1197,14 +1298,33 @@
                       <label>Phone</label>
                       <input value="${escapeHtml(consumer.phone)}" readonly />
                     </div>
-                    <button type="button" class="btn primary" data-action="consumer-scan" style="width:100%;">Scan product QR</button>
+                    <button type="button" class="btn primary" data-action="consumer-scan" style="width:100%;">Scan Aztec code</button>
                   </div>
                 </div>
               </div>
             </div>
           `;
 
-          document.querySelector('[data-action="consumer-scan"]')?.addEventListener('click', () => startQrScanner());
+          document.querySelectorAll('[data-action="consumer-scan"]').forEach((button) => button.addEventListener('click', async () => {
+            await startQrScanner(async (item) => {
+              const documentMatch = state.documents.find((doc) => doc.customerPhone === consumer.phone && (doc.radDossiers || []).some((rad) => rad.wadn === item.wadn));
+              const existing = (consumer.tracklyItems || []).find((owned) => owned.wadn === item.wadn);
+              const tracked = { ...item, category: normalizeCategory(item.category), retailerId: documentMatch?.retailerId || null, retailerName: documentMatch?.storeName || 'Self-tracked', verified: Boolean(documentMatch), purchaseDate: documentMatch?.createdAt || new Date().toISOString() };
+              consumer.tracklyItems = Array.isArray(consumer.tracklyItems) ? consumer.tracklyItems : [];
+              if (!existing) consumer.tracklyItems.push(tracked);
+              await writeTable('consumers', consumer);
+              await loadAllData();
+              showToast(documentMatch ? 'Verified tax bill and RAD history linked.' : 'Offline item added to Trackly.');
+              renderConsumerDashboard(consumer);
+            });
+          }));
+          document.querySelectorAll('[data-service-wadn]').forEach((button) => button.addEventListener('click', async () => {
+            const description = window.prompt('Briefly describe the issue:');
+            if (!description) return;
+            const item = ownedItems.find((entry) => entry.wadn === button.dataset.serviceWadn);
+            await writeTable('support_tickets', { id: uid(), wadn: item?.wadn, consumerPhone: consumer.phone, retailerId: item?.retailerId || null, category: normalizeCategory(item?.category), description, status: 'open', createdAt: new Date().toISOString() });
+            showToast('Service request sent to the retailer.');
+          }));
           document.querySelector('[data-action="logout"]')?.addEventListener('click', () => { state.session = null; saveSession(null); renderLanding(); });
         }
 
@@ -1237,6 +1357,10 @@
                       <input id="machine-batch" placeholder="Scan or enter batch number" />
                     </div>
                     <div class="two-col">
+                      <div class="field"><label>Category</label><select id="machine-category"><option value="consumables">Consumables</option><option value="pharma">Pharma</option><option value="electronics">Electronics</option></select></div>
+                      <div class="field"><label>WADN</label><input id="machine-wadn" placeholder="Unit serial" /></div>
+                    </div>
+                    <div class="two-col">
                       <div class="field">
                         <label>Qty</label>
                         <input id="machine-qty" type="number" value="1" min="1" />
@@ -1258,6 +1382,12 @@
                       <strong>Total</strong>
                       <strong id="machine-total">₹0</strong>
                     </div>
+                    <div class="two-col" style="margin-top:14px;">
+                      <div class="field"><label>Cash Received</label><input id="machine-cash" type="number" min="0" step="0.01" value="0" /></div>
+                      <div class="field"><label>Change Shortage</label><input id="machine-shortage" type="number" min="0" step="0.01" value="0" readonly /></div>
+                    </div>
+                    <div id="machine-credit-banner" class="schema-box hidden"></div>
+                    <button id="log-change-debt" class="btn warn" type="button" style="width:100%; margin-top:6px;">Log change debt</button>
                     <button id="submit-machine-sale" class="btn success" type="button" style="width:100%; margin-top:16px;">Finalize sale and issue credit</button>
                   </div>
                 </div>
@@ -1267,12 +1397,50 @@
 
           state.scanTarget = null;
           window.__machineCart = [];
+          window.__machineAppliedCredits = [];
+          window.__machineDebtRequested = false;
           renderMachineCart();
 
           document.getElementById('scan-machine-item')?.addEventListener('click', async () => {
-            await startQrScanner();
-            const batch = state.scanTarget || document.getElementById('machine-batch').value.trim();
-            if (batch) document.getElementById('machine-batch').value = batch;
+            await startQrScanner((item) => {
+              document.getElementById('machine-batch').value = item.batchNumber || '';
+              document.getElementById('machine-category').value = normalizeCategory(item.category);
+              document.getElementById('machine-wadn').value = item.wadn || '';
+              document.getElementById('machine-price').value = item.price || 0;
+              showToast(`Scanned ${item.wadn || item.batchNumber}`);
+            });
+          });
+
+          const refreshCreditBanner = async () => {
+            const phone = document.getElementById('machine-phone').value.trim();
+            const banner = document.getElementById('machine-credit-banner');
+            const credits = state.creditNotes.filter((note) => note.retailerId === retailer.id && note.consumerPhone === phone && note.status === 'active');
+            if (!phone || !credits.length) { banner.classList.add('hidden'); banner.innerHTML = ''; return; }
+            const balance = credits.reduce((sum, note) => sum + Number(note.amount || 0), 0);
+            banner.classList.remove('hidden');
+            banner.innerHTML = `<strong>Active change credit: ₹${formatCurrency(balance)}</strong><button type="button" class="btn success" id="apply-credit" style="width:100%; margin-top:10px;">Apply credit to this sale</button>`;
+            banner.querySelector('#apply-credit').onclick = () => {
+              window.__machineAppliedCredits = credits;
+              showToast('Credit will be redeemed when the sale is finalized.');
+              banner.innerHTML = `<strong>₹${formatCurrency(balance)} credit applied to this sale.</strong>`;
+            };
+          };
+          document.getElementById('machine-phone')?.addEventListener('input', refreshCreditBanner);
+          document.getElementById('machine-cash')?.addEventListener('input', () => {
+            const total = (window.__machineCart || []).reduce((sum, item) => sum + Number(item.total || 0), 0);
+            const cash = Number(document.getElementById('machine-cash').value || 0);
+            document.getElementById('machine-shortage').value = Math.max(0, cash - total).toFixed(2);
+          });
+          document.getElementById('log-change-debt')?.addEventListener('click', () => {
+            const total = (window.__machineCart || []).reduce((sum, item) => sum + Number(item.total || 0), 0);
+            const cash = Number(document.getElementById('machine-cash').value || 0);
+            const shortage = Math.max(0, cash - total);
+            if (!document.getElementById('machine-phone').value.trim() || !shortage) {
+              showToast('Enter the customer phone and cash received above the total.');
+              return;
+            }
+            window.__machineDebtRequested = true;
+            showToast(`₹${formatCurrency(shortage)} change debt will be logged with this sale.`);
           });
 
           document.getElementById('add-machine-item')?.addEventListener('click', () => {
@@ -1280,13 +1448,17 @@
             const batch = document.getElementById('machine-batch').value.trim();
             const qty = Number(document.getElementById('machine-qty').value || 1);
             const price = Number(document.getElementById('machine-price').value || 0);
+            const category = normalizeCategory(document.getElementById('machine-category').value);
+            const wadn = document.getElementById('machine-wadn').value.trim() || `WADN-${batch}-${Date.now()}`;
             if (!phone || !batch || !qty || !price) {
               showToast('Complete consumer phone, batch and price.');
               return;
             }
-            const entry = { batch, qty, price, total: qty * price };
+            const inventoryItem = state.inventory.find((item) => item.retailerId === retailer.id && (item.batchNumber === batch || item.wadn === wadn));
+            const entry = { batch, batchNumber: batch, wadn, category, warrantyMonths: Number(inventoryItem?.warrantyMonths || 0), expiry: inventoryItem?.expiry || '', qty, price, total: qty * price };
             window.__machineCart.push(entry);
             document.getElementById('machine-batch').value = '';
+            document.getElementById('machine-wadn').value = '';
             document.getElementById('machine-qty').value = 1;
             document.getElementById('machine-price').value = 0;
             renderMachineCart();
@@ -1299,6 +1471,11 @@
             if (!consumer) { showToast('Consumer account not found for this phone number.'); return; }
             const retailer = state.retailers.find((item) => item.id === machine.retailerId);
             const total = window.__machineCart.reduce((sum, item) => sum + Number(item.total || 0), 0);
+            const cashReceived = Number(document.getElementById('machine-cash').value || 0);
+            const appliedCredit = window.__machineAppliedCredits.reduce((sum, note) => sum + Number(note.amount || 0), 0);
+            const netPayable = Math.max(0, total - appliedCredit);
+            const shortage = Math.max(0, cashReceived - netPayable);
+            const amountPaid = Math.min(netPayable, cashReceived);
             const rewardPct = Number(retailer?.rewards?.percentage || 4);
             const fixedCredit = Number(retailer?.rewards?.fixedCredit || 25);
             const creditAmount = Math.max(0, total * (rewardPct / 100) + fixedCredit);
@@ -1309,11 +1486,45 @@
               consumerPhone: phone,
               machineId: machine.id,
               totalAmount: total,
+              amountPaid,
+              cashReceived,
+              changeDebtOwed: shortage,
+              changeDebtRequested: window.__machineDebtRequested,
+              creditApplied: appliedCredit,
               creditAmount,
               items: window.__machineCart,
               createdAt: new Date().toISOString()
             };
             await writeTable('transactions', transaction);
+            if (shortage > 0) {
+              await writeTable('credit_notes', { id: uid(), retailerId: retailer.id, retailerName: retailer.storeName || retailer.name, consumerPhone: phone, amount: shortage, status: 'active', transactionId: transaction.id, createdAt: transaction.createdAt });
+            }
+            for (const note of window.__machineAppliedCredits) {
+              note.status = 'redeemed';
+              note.redeemedAt = transaction.createdAt;
+              note.redeemedTransactionId = transaction.id;
+              await writeTable('credit_notes', note);
+            }
+            for (const soldItem of window.__machineCart) {
+              const inventoryItem = state.inventory.find((item) => item.retailerId === retailer.id && (item.batchNumber === soldItem.batchNumber || item.wadn === soldItem.wadn));
+              if (inventoryItem) {
+                inventoryItem.quantity = Math.max(0, Number(inventoryItem.quantity || 0) - Number(soldItem.qty || 0));
+                await writeTable('inventory', inventoryItem);
+              }
+            }
+            await writeTable('documents', {
+              id: `DOC-${transaction.id}`,
+              documentType: 'tax-invoice',
+              documentId: `DOC-${transaction.id}`,
+              retailerId: retailer.id,
+              storeName: retailer.storeName || retailer.name,
+              customerPhone: phone,
+              itemList: window.__machineCart,
+              amountPaid,
+              changeDebtOwed: shortage,
+              radDossiers: window.__machineCart.map((item) => ({ wadn: item.wadn, category: item.category, batchNumber: item.batchNumber, purchaseDate: transaction.createdAt, warrantyExpires: warrantyExpiry(item, new Date(transaction.createdAt)), verificationStatus: 'RAD-Verified' })),
+              createdAt: transaction.createdAt
+            });
             consumer.credits = Number(consumer.credits || 0) + Number(creditAmount || 0);
             consumer.purchases = Array.isArray(consumer.purchases) ? consumer.purchases : [];
             consumer.purchases.push({
@@ -1326,7 +1537,7 @@
             });
             await writeTable('consumers', consumer);
             await loadAllData();
-            showToast(`Credit added: ₹${formatCurrency(creditAmount)} to ${consumer.name}.`);
+            showToast(`Sale saved. Credit added: ₹${formatCurrency(creditAmount)} to ${consumer.name}.`);
             window.__machineCart = [];
             renderMachineDashboard(machine);
           });
@@ -1379,6 +1590,7 @@
             if (action === 'retail-inventory') renderDashboard('inventory');
             if (action === 'retail-profile') renderDashboard('profile');
             if (action === 'retail-billing') renderDashboard('billing');
+            if (action === 'retail-tickets') renderDashboard('tickets');
             if (action === 'consumer-home') renderDashboard();
             if (action === 'consumer-scan') await startQrScanner();
           });

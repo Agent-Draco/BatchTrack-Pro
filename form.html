@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BatchTrack - Final Survey</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root { --bg: #f5f1e8; --panel: #fffdf8; --ink: #17251f; --muted: #657169; --line: #d9ded2; --brand: #173d35; --accent: #e56b38; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: radial-gradient(circle at 10% 0, #f5d65c 0, transparent 20rem), var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif; }
+      main { width: min(860px, calc(100% - 28px)); margin: 0 auto; padding: 42px 0 70px; }
+      header, fieldset, .submit-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 18px 45px rgba(31, 48, 38, 0.08); }
+      header { padding: 34px; margin-bottom: 18px; }
+      .eyebrow { color: #85551c; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      h1, h2 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -.04em; }
+      h1 { font-size: clamp(2.2rem, 6vw, 4.1rem); line-height: 1; margin: 14px 0; }
+      h2 { font-size: 1.25rem; margin: 0 0 18px; }
+      p { color: var(--muted); line-height: 1.65; }
+      form { display: grid; gap: 14px; }
+      fieldset { min-width: 0; padding: 24px; }
+      legend { padding: 0 8px; font-weight: 800; font-size: 1.05rem; }
+      .question-note { color: var(--muted); font-size: .9rem; margin: -4px 0 14px; }
+      label.option { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; }
+      label.option:hover { background: #f7f4ec; border-color: var(--line); }
+      input { accent-color: var(--accent); margin-top: 3px; }
+      .submit-panel { padding: 22px 24px; position: sticky; bottom: 14px; }
+      button { border: 0; border-radius: 8px; padding: 12px 18px; background: var(--brand); color: white; cursor: pointer; font-weight: 800; }
+      button:hover { background: #24574b; }
+      #status { display: inline-block; margin-left: 12px; color: var(--muted); font-size: .9rem; }
+      @media (max-width: 600px) { main { padding-top: 18px; } header, fieldset { padding: 20px; } .submit-panel { padding: 16px; } #status { display: block; margin: 10px 0 0; } }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      window.BATCHTRACK_SUPABASE_CONFIG = {
+        url: 'https://bwiytslmkiyzdaijjtka.supabase.co',
+        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJid2l5dHNsbWtpeXpkYWlqdGthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNDcxOTYsImV4cCI6MjEwNDYyMzE5Nn0.Rke5rXqI5bS9lRbwsW5lXLyCWe2qhWkY6-pCMZqbM6o'
+      };
+      const batchTrackSupabase = window.supabase.createClient(
+        window.BATCHTRACK_SUPABASE_CONFIG.url,
+        window.BATCHTRACK_SUPABASE_CONFIG.anonKey
+      );
+    </script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">BatchTrack research</div>
+        <h1>Final Survey</h1>
+        <p>Help us understand how people manage products across the shelf and the home. Choose the answer that best matches your current experience. Responses are saved in this browser and can be downloaded as CSV for analysis.</p>
+      </header>
+
+      <form id="survey-form">
+        <fieldset>
+          <legend>Q1. Are you answering this survey mainly as a...</legend>
+          <label class="option"><input required type="radio" name="q1" value="Consumer/household member" /> Consumer/household member</label>
+          <label class="option"><input type="radio" name="q1" value="Retailer/shop owner" /> Retailer/shop owner</label>
+          <label class="option"><input type="radio" name="q1" value="Both" /> Both</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Q2. How do you currently keep track of products that you buy or sell?</legend>
+          <label class="option"><input required type="radio" name="q2" value="Memory" /> Memory</label>
+          <label class="option"><input type="radio" name="q2" value="Paper/physical ledger" /> Paper/physical ledger</label>
+          <label class="option"><input type="radio" name="q2" value="WhatsApp/messages" /> WhatsApp/messages</label>
+          <label class="option"><input type="radio" name="q2" value="Excel/spreadsheets" /> Excel/spreadsheets</label>
+          <label class="option"><input type="radio" name="q2" value="Billing/inventory software" /> Billing/inventory software</label>
+          <label class="option"><input type="radio" name="q2" value="Dedicated app" /> Dedicated app</label>
+          <label class="option"><input type="radio" name="q2" value="I don't systematically track them" /> I don't systematically track them</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Q3. Have you ever lost money because a product was forgotten, expired, damaged, duplicated, or could not be returned in time?</legend>
+          <label class="option"><input required type="radio" name="q3" value="Frequently" /> Frequently</label>
+          <label class="option"><input type="radio" name="q3" value="Sometimes" /> Sometimes</label>
+          <label class="option"><input type="radio" name="q3" value="Rarely" /> Rarely</label>
+          <label class="option"><input type="radio" name="q3" value="Never" /> Never</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Q4. How do you currently keep track of expiry dates, return deadlines, warranties, receipts or other important product information?</legend>
+          <label class="option"><input required type="radio" name="q4" value="I remember them" /> I remember them</label>
+          <label class="option"><input type="radio" name="q4" value="I check the product manually" /> I check the product manually</label>
+          <label class="option"><input type="radio" name="q4" value="Paper notes/ledger" /> Paper notes/ledger</label>
+          <label class="option"><input type="radio" name="q4" value="Phone reminders" /> Phone reminders</label>
+          <label class="option"><input type="radio" name="q4" value="App/software" /> App/software</label>
+          <label class="option"><input type="radio" name="q4" value="I generally don't track them" /> I generally don't track them</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Q5. What is the biggest reason you don't track product information more systematically?</legend>
+          <label class="option"><input required type="radio" name="q5" value="Too much manual entry" /> Too much manual entry</label>
+          <label class="option"><input type="radio" name="q5" value="I forget to update it" /> I forget to update it</label>
+          <label class="option"><input type="radio" name="q5" value="It takes too much time" /> It takes too much time</label>
+          <label class="option"><input type="radio" name="q5" value="Information is scattered" /> Information is scattered</label>
+          <label class="option"><input type="radio" name="q5" value="Existing apps/software are complicated" /> Existing apps/software are complicated</label>
+          <label class="option"><input type="radio" name="q5" value="Privacy concerns" /> Privacy concerns</label>
+          <label class="option"><input type="radio" name="q5" value="I don't think about it until there is a problem" /> I don't think about it until there is a problem</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Q6. For retailers: How do you currently identify products that are approaching expiry or their distributor return deadline?</legend>
+          <label class="option"><input required type="radio" name="q6" value="Manually check shelves" /> Manually check shelves</label>
+          <label class="option"><input type="radio" name="q6" value="Paper ledger" /> Paper ledger</label>
+          <label class="option"><input type="radio" name="q6" value="Excel/software" /> Excel/software</label>
+          <label class="option"><input type="radio" name="q6" value="Distributor informs me" /> Distributor informs me</label>
+          <label class="option"><input type="radio" name="q6" value="Staff memory" /> Staff memory</label>
+          <label class="option"><input type="radio" name="q6" value="We don't systematically track this" /> We don't systematically track this</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Q7. For retailers: How do you usually place orders with distributors/suppliers?</legend>
+          <label class="option"><input required type="radio" name="q7" value="WhatsApp" /> WhatsApp</label>
+          <label class="option"><input type="radio" name="q7" value="Phone call" /> Phone call</label>
+          <label class="option"><input type="radio" name="q7" value="In person" /> In person</label>
+          <label class="option"><input type="radio" name="q7" value="SMS" /> SMS</label>
+          <label class="option"><input type="radio" name="q7" value="Distributor app/software" /> Distributor app/software</label>
+          <label class="option"><input type="radio" name="q7" value="Other" /> Other</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Q8. Have you ever bought a product you already had at home because you forgot you had it?</legend>
+          <label class="option"><input required type="radio" name="q8" value="Frequently" /> Frequently</label>
+          <label class="option"><input type="radio" name="q8" value="Sometimes" /> Sometimes</label>
+          <label class="option"><input type="radio" name="q8" value="Rarely" /> Rarely</label>
+          <label class="option"><input type="radio" name="q8" value="Never" /> Never</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Q9. Have you ever discovered a food, medicine, cosmetic or household product only after it had expired or was no longer usable?</legend>
+          <label class="option"><input required type="radio" name="q9" value="Frequently" /> Frequently</label>
+          <label class="option"><input type="radio" name="q9" value="Sometimes" /> Sometimes</label>
+          <label class="option"><input type="radio" name="q9" value="Rarely" /> Rarely</label>
+          <label class="option"><input type="radio" name="q9" value="Never" /> Never</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Q10. How useful would a system be that lets you scan a product once and automatically creates a digital record containing relevant information such as expiry, batch, purchase date, stock/ownership and reminders?</legend>
+          <label class="option"><input required type="radio" name="q10" value="Extremely useful" /> Extremely useful</label>
+          <label class="option"><input type="radio" name="q10" value="Very useful" /> Very useful</label>
+          <label class="option"><input type="radio" name="q10" value="Moderately useful" /> Moderately useful</label>
+          <label class="option"><input type="radio" name="q10" value="Slightly useful" /> Slightly useful</label>
+          <label class="option"><input type="radio" name="q10" value="Not useful" /> Not useful</label>
+        </fieldset>
+
+        <div class="submit-panel">
+          <button type="submit">Save response and download CSV</button>
+          <span id="status" role="status"></span>
+        </div>
+      </form>
+    </main>
+    <script>
+      const form = document.getElementById('survey-form');
+      const status = document.getElementById('status');
+      const csvEscape = (value) => '"' + String(value).replace(/"/g, '""') + '"';
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const data = new FormData(form);
+        const response = { submittedAt: new Date().toISOString() };
+        for (let index = 1; index <= 10; index += 1) response['q' + index] = data.get('q' + index) || '';
+        const headers = Object.keys(response);
+        const csv = headers.map(csvEscape).join(',') + '\n' + headers.map((key) => csvEscape(response[key])).join(',') + '\n';
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'batchtrack-survey-response.csv';
+        link.click();
+        URL.revokeObjectURL(link.href);
+        localStorage.setItem('batchtrack_survey_response', JSON.stringify(response));
+        const { error } = await batchTrackSupabase.from('survey_responses').insert({
+          id: crypto.randomUUID(),
+          response,
+          submitted_at: response.submittedAt
+        });
+        if (error) {
+          status.textContent = 'CSV downloaded; cloud save failed, so the response remains in this browser.';
+          console.error('BatchTrack survey upload failed:', error);
+          return;
+        }
+        status.textContent = 'Response saved to Supabase and CSV download started.';
+      });
+    </script>
+  </body>
+</html>

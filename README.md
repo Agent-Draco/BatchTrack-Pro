@@ -1,6 +1,6 @@
 # BatchTrack Pro
 
-BatchTrack Pro is a local-first inventory, product traceability, retailer rewards, consumer credit, and billing-machine workspace. The main application is a browser app contained in `index0.html` and served through a local HTTP server.
+BatchTrack Pro is a Supabase-backed inventory, product traceability, retailer rewards, consumer credit, billing-machine, and survey workspace. The main application is a browser app contained in `index.html` and served through a local HTTP server.
 
 ## Features
 
@@ -16,16 +16,20 @@ BatchTrack Pro is a local-first inventory, product traceability, retailer reward
 - Retailer-defined percentage and fixed reward credits
 - Consumer purchase history and credit balance
 - Desktop and phone presentation modes
-- IndexedDB persistence through application-server restarts
+- Supabase persistence through application-server restarts and across devices
+- Survey response storage in Supabase with CSV download fallback
 
 ## Project Structure
 
 ```text
 .
-├── index0.html              Main BatchTrack Pro application
+├── index.html               Main BatchTrack Pro application
+├── form.html                Final research survey
 ├── database/
-│   ├── local-db.js          IndexedDB adapter
-│   └── README.md             Local database persistence notes
+│   ├── local-db.js          Supabase table adapter
+│   └── README.md             Supabase persistence notes
+├── supabase/
+│   └── migrations/           PostgreSQL schema migrations
 ├── gate-entry.html          Separate gate-entry prototype
 └── README.md                Project documentation
 ```
@@ -49,7 +53,7 @@ python -m http.server 8000
 3. Open the app in your browser:
 
 ```text
-http://localhost:8000/index0.html
+http://localhost:8000/index.html
 ```
 
 Keep the PowerShell window running while using the app. Stop the server with `Ctrl+C`.
@@ -93,9 +97,9 @@ Batch number | Quantity | Price | Expiry | Warranty | Mfg date | Mfg place | War
 
 Rows without a batch number are ignored. Uploaded records are saved to the retailer's local inventory table.
 
-## Local Database
+## Supabase Database
 
-The application uses the browser's IndexedDB database named `batchtrack_local_db`. It contains these stores:
+The application uses Supabase tables through the adapter in [database/local-db.js](database/local-db.js). The initial migration creates:
 
 - `retailers`
 - `consumers`
@@ -103,18 +107,20 @@ The application uses the browser's IndexedDB database named `batchtrack_local_db
 - `inventory`
 - `transactions`
 - `sessions`
+- `survey_responses`
 
-The persistence adapter is [database/local-db.js](database/local-db.js). It exposes table-level `read`, `put`, `remove`, and `find` operations so a future cloud repository can follow the same boundary.
+The adapter preserves the table-level `read`, `put`, `remove`, and `find` API used by the UI. Records are stored as JSONB in the `record` column so the prototype can evolve without changing the browser contract.
+
+The browser uses the Supabase URL and anon key configured in `.env` during setup. The anon key is safe to ship to a browser; access control must come from Supabase RLS. The initial prototype migration allows anonymous CRUD for the app tables and anonymous inserts for survey responses. Replace these policies with authenticated, tenant-scoped policies before production use.
 
 Data survives:
 
 - Python server restarts
 - Page reloads
 - Browser restarts
+- Switching browsers or devices
 
-Keep the same origin, including `http://localhost:8000`. Changing the scheme, host, port, or browser profile creates a separate browser storage area. Clearing site data deletes the local records.
-
-This is browser-local storage. It is not a shared server database. A multi-device deployment will need a backend API and a durable server database such as SQLite or Postgres.
+The app still needs an HTTP origin for its scripts and camera access, but its records are no longer tied to browser storage.
 
 ## External Browser Libraries
 
@@ -143,13 +149,11 @@ This local prototype intentionally does not include:
 
 Passwords are currently stored in browser-local IndexedDB for prototype operation. Do not use production credentials or sensitive customer data until a backend authentication and security layer is added.
 
-## Future Cloud Migration
+## Automatic Migrations
 
-The UI calls the local persistence layer through small table operations rather than accessing IndexedDB directly. A cloud migration can preserve the UI contract by replacing the local adapter with a repository that calls an API, then adding:
+The workflow in `.github/workflows/supabase-migrations.yml` runs `supabase db push` when migration files are pushed to `main`. Configure these GitHub repository secrets before enabling it:
 
-1. Server-side authentication and authorization
-2. SQLite or Postgres persistence
-3. Password hashing and session management
-4. Conflict handling and synchronization
-5. Database migrations and backups
-6. Server-side QR and transaction validation
+1. `SUPABASE_ACCESS_TOKEN`
+2. `SUPABASE_PROJECT_REF` set to `bwiytslmkiyzdaijjtka`
+
+The Supabase CLI itself is installed by the workflow, so no local compilation step is required.
