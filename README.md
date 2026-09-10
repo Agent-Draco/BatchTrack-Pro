@@ -17,7 +17,7 @@ BatchTrack Pro is a Supabase-backed inventory, product traceability, retailer re
 - Consumer purchase history and credit balance
 - Desktop and phone presentation modes
 - Supabase persistence through application-server restarts and across devices
-- Survey response storage in Supabase with CSV download fallback
+- Survey response storage in Supabase
 
 ## Project Structure
 
@@ -91,7 +91,7 @@ Do not open the pages directly with a `file://` URL. The application loads the d
 
 ### Survey
 
-Open `http://localhost:8000/form.html` to collect responses. Each submission downloads a CSV copy and inserts the response into the Supabase `survey_responses` table.
+Open `http://localhost:8000/form.html` to collect responses. Each submission inserts the response into the Supabase `survey_responses` table.
 
 ## Inventory Upload Schema
 
