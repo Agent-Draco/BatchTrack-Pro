@@ -2,6 +2,7 @@
   "cleanUrls": true,
   "rewrites": [
     { "source": "/app", "destination": "/index.html" },
+    { "source": "/form", "destination": "/form.html" },
     { "source": "/survey", "destination": "/form.html" }
   ],
   "headers": [
