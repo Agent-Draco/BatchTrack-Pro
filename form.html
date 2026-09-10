@@ -51,6 +51,15 @@
       .success-panel.show { display: block; }
       .hidden { display: none !important; }
       .success-mark { width: 58px; height: 58px; display: grid; place-items: center; margin: 0 auto 18px; border-radius: 50%; background: #e5f1e6; color: var(--brand); font-size: 28px; }
+      .access-panel { display: none; margin: 18px 0; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); box-shadow: var(--shadow); }
+      .access-panel.show { display: block; }
+      .access-form { display: flex; gap: 10px; max-width: 620px; }
+      .access-form input { width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; color: var(--ink); background: #fff; }
+      .response-summary { color: var(--muted); font-size: .9rem; margin: 18px 0 8px; }
+      .response-table { display: block; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+      .response-table table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 12px; }
+      .response-table th, .response-table td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+      .response-table th { color: var(--muted); background: #f7f4ec; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
       body.phone-mode main { width: min(430px, calc(100% - 20px)); padding-top: 12px; }
       body.phone-mode header { border-radius: 18px; padding: 22px; }
       body.phone-mode header::after { font-size: 7rem; right: 12px; bottom: -16px; }
@@ -85,11 +94,22 @@
       <header>
         <div class="topline">
           <div class="eyebrow">BatchTrack research / 2026</div>
-          <div class="header-actions"><a class="text-link" href="/app">Back to app</a><button id="phone-mode-toggle" class="mode-button" type="button">Phone view</button></div>
+          <div class="header-actions"><a class="text-link" href="/app">Back to app</a><button id="view-responses-button" class="text-link" type="button">View responses</button><button id="phone-mode-toggle" class="mode-button" type="button">Phone view</button></div>
         </div>
         <h1>Tell us what gets lost between shelf and home.</h1>
         <p>Your answers will help shape Avero, Trackly, and the BatchTrack product record. There are 10 quick questions, and no account is required.</p>
       </header>
+
+      <section id="access-panel" class="access-panel" aria-labelledby="access-title">
+        <div class="topline"><div><div class="eyebrow">Private review</div><h2 id="access-title">View survey responses</h2></div><button id="close-access" class="text-link" type="button">Close</button></div>
+        <p>Enter the reviewer password to load response data from Supabase.</p>
+        <form id="access-form" class="access-form">
+          <input id="access-password" type="password" autocomplete="current-password" placeholder="Reviewer password" required />
+          <button type="submit">Unlock</button>
+        </form>
+        <div id="access-status" class="response-summary" role="status"></div>
+        <div id="response-results" class="response-table hidden"></div>
+      </section>
 
       <section class="progress" aria-label="Survey progress">
         <div class="progress-meta"><span><strong id="answered-count">0</strong> of 10 answered</span><span id="progress-label">Start anywhere</span></div>
@@ -210,7 +230,13 @@
       const progressFill = document.getElementById('progress-fill');
       const progressLabel = document.getElementById('progress-label');
       const phoneModeToggle = document.getElementById('phone-mode-toggle');
+      const accessPanel = document.getElementById('access-panel');
+      const accessForm = document.getElementById('access-form');
+      const accessPassword = document.getElementById('access-password');
+      const accessStatus = document.getElementById('access-status');
+      const responseResults = document.getElementById('response-results');
       const csvEscape = (value) => '"' + String(value).replace(/"/g, '""') + '"';
+      const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
 
       document.querySelectorAll('fieldset').forEach((fieldset, index) => {
         const legend = fieldset.querySelector('legend');
@@ -231,6 +257,31 @@
       phoneModeToggle.addEventListener('click', () => {
         document.body.classList.toggle('phone-mode');
         phoneModeToggle.textContent = document.body.classList.contains('phone-mode') ? 'Desktop view' : 'Phone view';
+      });
+      document.getElementById('view-responses-button').addEventListener('click', () => {
+        accessPanel.classList.add('show');
+        accessPassword.focus();
+      });
+      document.getElementById('close-access').addEventListener('click', () => accessPanel.classList.remove('show'));
+      accessForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        accessStatus.textContent = 'Checking access...';
+        responseResults.classList.add('hidden');
+        const response = await fetch('/api/survey-responses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: accessPassword.value })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          accessStatus.textContent = payload.error || 'Unable to load responses.';
+          return;
+        }
+        accessPassword.value = '';
+        const rows = payload.responses || [];
+        accessStatus.textContent = `${rows.length} response${rows.length === 1 ? '' : 's'} loaded.`;
+        responseResults.innerHTML = `<table><thead><tr><th>Submitted</th>${Array.from({ length: 10 }, (_, index) => `<th>Q${index + 1}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(new Date(row.submitted_at || row.created_at).toLocaleString())}</td>${Array.from({ length: 10 }, (_, index) => `<td>${escapeHtml(row.response?.['q' + (index + 1)] || '')}</td>`).join('')}</tr>`).join('') || '<tr><td colspan="11">No responses yet.</td></tr>'}</tbody></table>`;
+        responseResults.classList.remove('hidden');
       });
       updateProgress();
 

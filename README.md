@@ -137,8 +137,10 @@ Import the repository into Vercel as a static project. Add these Vercel environm
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only, never expose it to the browser)
+- `SURVEY_RESPONSES_PASSWORD` = `TheTridentTrio@2027`
 
-The `/api/config` function serves only these public client values at runtime, so the same build works locally and on Vercel. The `vercel.json` routes `/app` to the main app and `/survey` to the survey. Never configure a Supabase service-role key as a browser environment variable.
+The `/api/config` function serves only the public client values at runtime, so the same build works locally and on Vercel. The `/api/survey-responses` function validates the case-insensitive reviewer password and reads responses with the server-only service key. The `vercel.json` routes `/app` to the main app and `/survey` to the survey. Never expose the service-role key in browser code.
 
 ## Supabase Setup
 
