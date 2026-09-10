@@ -38,9 +38,9 @@ BatchTrack Pro is a Supabase-backed inventory, product traceability, retailer re
 
 ### Local HTTP server
 
-1. Open a terminal in the project folder:
+1. Open PowerShell in the project folder:
 
-```bash
+```powershell
 cd /workspaces/BatchTrack-Pro
 ```
 
@@ -56,7 +56,7 @@ python -m http.server 8000
 http://localhost:8000/index.html
 ```
 
-Keep the terminal running while using the app. Stop the server with `Ctrl+C`.
+Keep the PowerShell window running while using the app. Stop the server with `Ctrl+C`.
 
 Do not open the pages directly with a `file://` URL. The application loads the database adapter and external browser libraries through HTTP, and camera access is more reliable from a local HTTP origin.
 
