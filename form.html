@@ -8,29 +8,62 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
     <style>
-      :root { --bg: #f5f1e8; --panel: #fffdf8; --ink: #17251f; --muted: #657169; --line: #d9ded2; --brand: #173d35; --accent: #e56b38; }
+      :root { --bg: #f3efe5; --panel: rgba(255,253,248,.94); --ink: #17251f; --muted: #657169; --line: #d8ded1; --brand: #173d35; --accent: #e56b38; --yellow: #f5d65c; --shadow: 0 24px 70px rgba(31,48,38,.12); }
       * { box-sizing: border-box; }
-      body { margin: 0; background: radial-gradient(circle at 10% 0, #f5d65c 0, transparent 20rem), var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif; }
-      main { width: min(860px, calc(100% - 28px)); margin: 0 auto; padding: 42px 0 70px; }
-      header, fieldset, .submit-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 18px 45px rgba(31, 48, 38, 0.08); }
-      header { padding: 34px; margin-bottom: 18px; }
-      .eyebrow { color: #85551c; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 7% 0, rgba(245,214,92,.72), transparent 23rem), radial-gradient(circle at 100% 35%, rgba(229,107,56,.1), transparent 28rem), var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif; }
+      body::before { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: .18; background-image: linear-gradient(rgba(23,61,53,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(23,61,53,.05) 1px, transparent 1px); background-size: 28px 28px; mask-image: linear-gradient(to bottom, black, transparent 75%); }
+      main { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 30px 0 80px; position: relative; }
+      header, fieldset, .submit-panel { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(12px); }
+      header { border-radius: 24px; padding: clamp(24px, 5vw, 52px); margin-bottom: 18px; overflow: hidden; position: relative; }
+      header::after { content: '01'; position: absolute; right: 32px; bottom: -28px; color: rgba(229,107,56,.13); font: 800 10rem/1 'Space Grotesk', sans-serif; }
+      .topline, .progress-meta, .submit-panel { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+      .eyebrow { color: #85551c; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
       h1, h2 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -.04em; }
-      h1 { font-size: clamp(2.2rem, 6vw, 4.1rem); line-height: 1; margin: 14px 0; }
-      h2 { font-size: 1.25rem; margin: 0 0 18px; }
-      p { color: var(--muted); line-height: 1.65; }
+      h1 { max-width: 620px; font-size: clamp(2.5rem, 8vw, 5.3rem); line-height: .94; margin: 18px 0; position: relative; z-index: 1; }
+      h2 { font-size: 1.15rem; margin: 0 0 8px; }
+      p { color: var(--muted); line-height: 1.7; max-width: 650px; position: relative; z-index: 1; }
+      .header-actions { display: flex; align-items: center; gap: 8px; position: relative; z-index: 2; }
+      .text-link, .mode-button { border: 1px solid var(--line); border-radius: 999px; padding: 9px 13px; background: rgba(255,255,255,.65); color: var(--brand); text-decoration: none; cursor: pointer; font: 700 12px 'DM Sans', sans-serif; }
+      .mode-button { display: inline-flex; align-items: center; gap: 7px; }
+      .mode-button::before { content: '◐'; color: var(--accent); font-size: 16px; }
+      .progress { margin: 18px 0 14px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,253,248,.78); position: sticky; top: 12px; z-index: 5; box-shadow: 0 10px 30px rgba(31,48,38,.08); }
+      .progress-meta { color: var(--muted); font-size: 12px; font-weight: 700; }
+      .progress-meta strong { color: var(--brand); }
+      .progress-track { height: 7px; border-radius: 999px; background: #e7e4da; overflow: hidden; margin-top: 11px; }
+      #progress-fill { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--yellow)); transition: width .25s ease; }
       form { display: grid; gap: 14px; }
-      fieldset { min-width: 0; padding: 24px; }
-      legend { padding: 0 8px; font-weight: 800; font-size: 1.05rem; }
-      .question-note { color: var(--muted); font-size: .9rem; margin: -4px 0 14px; }
-      label.option { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; }
-      label.option:hover { background: #f7f4ec; border-color: var(--line); }
-      input { accent-color: var(--accent); margin-top: 3px; }
-      .submit-panel { padding: 22px 24px; position: sticky; bottom: 14px; }
-      button { border: 0; border-radius: 8px; padding: 12px 18px; background: var(--brand); color: white; cursor: pointer; font-weight: 800; }
-      button:hover { background: #24574b; }
-      #status { display: inline-block; margin-left: 12px; color: var(--muted); font-size: .9rem; }
-      @media (max-width: 600px) { main { padding-top: 18px; } header, fieldset { padding: 20px; } .submit-panel { padding: 16px; } #status { display: block; margin: 10px 0 0; } }
+      fieldset { min-width: 0; border-radius: 16px; padding: 24px; scroll-margin-top: 100px; transition: border-color .2s ease, transform .2s ease; }
+      fieldset:hover { border-color: #b7c4b7; transform: translateY(-1px); }
+      legend { max-width: 100%; padding: 0 8px; font-weight: 800; font-size: 1.08rem; line-height: 1.4; }
+      .question-index { color: var(--accent); font: 800 11px 'Space Grotesk', sans-serif; letter-spacing: .08em; text-transform: uppercase; display: block; margin-bottom: 7px; }
+      label.option { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 11px 13px; margin-top: 7px; border: 1px solid transparent; border-radius: 10px; cursor: pointer; color: #304039; transition: background .16s ease, border-color .16s ease, transform .16s ease; }
+      label.option:hover { background: #f7f4ec; border-color: var(--line); transform: translateX(2px); }
+      label.option:has(input:checked) { background: #edf4ed; border-color: #a9c5ad; color: var(--brand); font-weight: 700; }
+      input { width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--accent); }
+      .submit-panel { padding: 16px 18px; position: sticky; bottom: 14px; border-radius: 16px; z-index: 6; }
+      .submit-panel button { min-height: 46px; }
+      button { border: 0; border-radius: 9px; padding: 12px 18px; background: var(--brand); color: white; cursor: pointer; font-weight: 800; transition: transform .16s ease, background .16s ease; }
+      button:hover { background: #24574b; transform: translateY(-1px); }
+      button:disabled { cursor: wait; opacity: .65; transform: none; }
+      #status { color: var(--muted); font-size: .88rem; line-height: 1.4; text-align: right; }
+      .success-panel { display: none; padding: 42px; text-align: center; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
+      .success-panel.show { display: block; }
+      .hidden { display: none !important; }
+      .success-mark { width: 58px; height: 58px; display: grid; place-items: center; margin: 0 auto 18px; border-radius: 50%; background: #e5f1e6; color: var(--brand); font-size: 28px; }
+      body.phone-mode main { width: min(430px, calc(100% - 20px)); padding-top: 12px; }
+      body.phone-mode header { border-radius: 18px; padding: 22px; }
+      body.phone-mode header::after { font-size: 7rem; right: 12px; bottom: -16px; }
+      body.phone-mode h1 { font-size: 2.55rem; }
+      body.phone-mode .topline { align-items: flex-start; flex-direction: column; }
+      body.phone-mode .progress { top: 8px; }
+      body.phone-mode fieldset { padding: 19px; border-radius: 13px; }
+      body.phone-mode legend { font-size: 1rem; }
+      body.phone-mode .submit-panel { display: block; padding: 14px; }
+      body.phone-mode .submit-panel button { width: 100%; }
+      body.phone-mode #status { display: block; margin-top: 10px; text-align: left; }
+      @media (max-width: 620px) { main { width: min(100% - 20px, 920px); padding-top: 12px; } header { padding: 24px; border-radius: 18px; } .topline { align-items: flex-start; flex-direction: column; } .header-actions { width: 100%; justify-content: space-between; } h1 { font-size: 3rem; } fieldset { padding: 20px; } .submit-panel { display: block; } .submit-panel button { width: 100%; } #status { display: block; margin-top: 10px; text-align: left; } }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; } }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
@@ -38,19 +71,30 @@
         url: 'https://bwiytslmkiyzdaijjtka.supabase.co',
         anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJid2l5dHNsbWtpeXpkYWlqdGthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNDcxOTYsImV4cCI6MjEwNDYyMzE5Nn0.Rke5rXqI5bS9lRbwsW5lXLyCWe2qhWkY6-pCMZqbM6o'
       };
-      const batchTrackSupabase = window.supabase.createClient(
-        window.BATCHTRACK_SUPABASE_CONFIG.url,
-        window.BATCHTRACK_SUPABASE_CONFIG.anonKey
-      );
+      const batchTrackConfigReady = fetch('/api/config')
+        .then((response) => response.ok ? response.json() : null)
+        .then((config) => {
+          if (config?.url && config?.anonKey) window.BATCHTRACK_SUPABASE_CONFIG = config;
+          return window.supabase.createClient(window.BATCHTRACK_SUPABASE_CONFIG.url, window.BATCHTRACK_SUPABASE_CONFIG.anonKey);
+        })
+        .catch(() => window.supabase.createClient(window.BATCHTRACK_SUPABASE_CONFIG.url, window.BATCHTRACK_SUPABASE_CONFIG.anonKey));
     </script>
   </head>
   <body>
     <main>
       <header>
-        <div class="eyebrow">BatchTrack research</div>
-        <h1>Final Survey</h1>
-        <p>Help us understand how people manage products across the shelf and the home. Choose the answer that best matches your current experience. Responses are saved in this browser and can be downloaded as CSV for analysis.</p>
+        <div class="topline">
+          <div class="eyebrow">BatchTrack research / 2026</div>
+          <div class="header-actions"><a class="text-link" href="/app">Back to app</a><button id="phone-mode-toggle" class="mode-button" type="button">Phone view</button></div>
+        </div>
+        <h1>Tell us what gets lost between shelf and home.</h1>
+        <p>Your answers will help shape Avero, Trackly, and the BatchTrack product record. There are 10 quick questions, and no account is required.</p>
       </header>
+
+      <section class="progress" aria-label="Survey progress">
+        <div class="progress-meta"><span><strong id="answered-count">0</strong> of 10 answered</span><span id="progress-label">Start anywhere</span></div>
+        <div class="progress-track"><span id="progress-fill"></span></div>
+      </section>
 
       <form id="survey-form">
         <fieldset>
@@ -146,17 +190,58 @@
         </fieldset>
 
         <div class="submit-panel">
-          <button type="submit">Save response and download CSV</button>
+          <button id="submit-button" type="submit">Submit response</button>
           <span id="status" role="status"></span>
         </div>
       </form>
+      <section id="success-panel" class="success-panel" role="status">
+        <div class="success-mark">✓</div>
+        <h2>Thank you. Your response is in.</h2>
+        <p>Your response was saved to the research database and a CSV copy was downloaded for your records.</p>
+        <a class="text-link" href="/app">Return to BatchTrack</a>
+      </section>
     </main>
     <script>
       const form = document.getElementById('survey-form');
       const status = document.getElementById('status');
+      const submitButton = document.getElementById('submit-button');
+      const successPanel = document.getElementById('success-panel');
+      const answeredCount = document.getElementById('answered-count');
+      const progressFill = document.getElementById('progress-fill');
+      const progressLabel = document.getElementById('progress-label');
+      const phoneModeToggle = document.getElementById('phone-mode-toggle');
       const csvEscape = (value) => '"' + String(value).replace(/"/g, '""') + '"';
+
+      document.querySelectorAll('fieldset').forEach((fieldset, index) => {
+        const legend = fieldset.querySelector('legend');
+        const question = document.createElement('span');
+        question.className = 'question-index';
+        question.textContent = `Question ${String(index + 1).padStart(2, '0')}`;
+        legend.prepend(question);
+      });
+
+      function updateProgress() {
+        const answered = Array.from({ length: 10 }, (_, index) => form.querySelector(`input[name="q${index + 1}"]:checked`)).filter(Boolean).length;
+        answeredCount.textContent = answered;
+        progressFill.style.width = `${answered * 10}%`;
+        progressLabel.textContent = answered === 0 ? 'Start anywhere' : answered === 10 ? 'Ready to submit' : `${10 - answered} questions to go`;
+      }
+
+      document.querySelectorAll('input[type="radio"]').forEach((input) => input.addEventListener('change', updateProgress));
+      phoneModeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('phone-mode');
+        phoneModeToggle.textContent = document.body.classList.contains('phone-mode') ? 'Desktop view' : 'Phone view';
+      });
+      updateProgress();
+
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
+        if (!form.checkValidity()) {
+          form.reportValidity();
+          return;
+        }
+        submitButton.disabled = true;
+        status.textContent = 'Saving securely...';
         const data = new FormData(form);
         const response = { submittedAt: new Date().toISOString() };
         for (let index = 1; index <= 10; index += 1) response['q' + index] = data.get('q' + index) || '';
@@ -168,7 +253,7 @@
         link.download = 'batchtrack-survey-response.csv';
         link.click();
         URL.revokeObjectURL(link.href);
-        localStorage.setItem('batchtrack_survey_response', JSON.stringify(response));
+        const batchTrackSupabase = await batchTrackConfigReady;
         const { error } = await batchTrackSupabase.from('survey_responses').insert({
           id: crypto.randomUUID(),
           response,
@@ -176,10 +261,13 @@
         });
         if (error) {
           status.textContent = 'CSV downloaded; cloud save failed, so the response remains in this browser.';
+          submitButton.disabled = false;
           console.error('BatchTrack survey upload failed:', error);
           return;
         }
-        status.textContent = 'Response saved to Supabase and CSV download started.';
+        form.classList.add('hidden');
+        document.querySelector('.progress').classList.add('hidden');
+        successPanel.classList.add('show');
       });
     </script>
   </body>

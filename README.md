@@ -30,6 +30,8 @@ BatchTrack Pro is a Supabase-backed inventory, product traceability, retailer re
 │   └── README.md             Supabase persistence notes
 ├── supabase/
 │   └── migrations/           PostgreSQL schema migrations
+├── api/config.js             Vercel runtime configuration endpoint
+├── vercel.json               Vercel routes and security headers
 ├── gate-entry.html          Separate gate-entry prototype
 └── README.md                Project documentation
 ```
@@ -128,6 +130,15 @@ Data survives:
 - Switching browsers or devices
 
 The app still needs an HTTP origin for its scripts and camera access, but its records are no longer tied to browser storage.
+
+## Vercel Deployment
+
+Import the repository into Vercel as a static project. Add these Vercel environment variables for Production, Preview, and Development:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+
+The `/api/config` function serves only these public client values at runtime, so the same build works locally and on Vercel. The `vercel.json` routes `/app` to the main app and `/survey` to the survey. Never configure a Supabase service-role key as a browser environment variable.
 
 ## Supabase Setup
 

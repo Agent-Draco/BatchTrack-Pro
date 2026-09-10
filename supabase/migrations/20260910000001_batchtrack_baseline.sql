@@ -5,19 +5,14 @@ create table if not exists public.retailers (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.consumers (
-  id text primary key,
-  record jsonb not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-create table if not exists public.machines (like public.consumers);
-create table if not exists public.inventory (like public.consumers);
-create table if not exists public.transactions (like public.consumers);
-create table if not exists public.documents (like public.consumers);
-create table if not exists public.credit_notes (like public.consumers);
-create table if not exists public.support_tickets (like public.consumers);
-create table if not exists public.sessions (like public.consumers);
+create table if not exists public.consumers (like public.retailers);
+create table if not exists public.machines (like public.retailers);
+create table if not exists public.inventory (like public.retailers);
+create table if not exists public.transactions (like public.retailers);
+create table if not exists public.documents (like public.retailers);
+create table if not exists public.credit_notes (like public.retailers);
+create table if not exists public.support_tickets (like public.retailers);
+create table if not exists public.sessions (like public.retailers);
 
 create table if not exists public.survey_responses (
   id uuid primary key,

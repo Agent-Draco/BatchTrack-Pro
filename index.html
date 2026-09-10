@@ -179,6 +179,13 @@
         url: 'https://bwiytslmkiyzdaijjtka.supabase.co',
           anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJid2l5dHNsbWtpeXpkYWlqdGthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNDcxOTYsImV4cCI6MjEwNDYyMzE5Nn0.Rke5rXqI5bS9lRbwsW5lXLyCWe2qhWkY6-pCMZqbM6o'
       };
+      window.batchTrackConfigReady = fetch('/api/config')
+        .then((response) => response.ok ? response.json() : null)
+        .then((config) => {
+          if (config?.url && config?.anonKey) window.BATCHTRACK_SUPABASE_CONFIG = config;
+          return window.BATCHTRACK_SUPABASE_CONFIG;
+        })
+        .catch(() => window.BATCHTRACK_SUPABASE_CONFIG);
     </script>
     <script src="./database/local-db.js"></script>
     <script type="module">
@@ -340,6 +347,7 @@
                 <div class="brand"><span class="brand-mark">B</span> BatchTrack Pro</div>
                 <div class="nav-links">
                   ${modeControl()}
+                  <a class="nav-action" href="/survey">Take survey</a>
                   <button class="nav-action" type="button" data-action="go-retailer-auth">Retailer login</button>
                   <button class="nav-action" type="button" data-action="go-signup">Create account</button>
                   <button class="nav-action primary" type="button" data-action="go-consumer-auth">Consumer login</button>
@@ -348,9 +356,9 @@
 
               <section class="hero">
                 <div class="panel hero-copy">
-                  <div class="eyebrow">Local-first inventory + reward ledger</div>
+                  <div class="eyebrow">Supabase inventory + ownership ledger</div>
                   <h1>Track stock, rewards, and ownership in one system.</h1>
-                  <p class="sub">BatchTrack Pro stores real retailer, consumer, billing-machine and product records locally in IndexedDB while staying ready to move to a cloud database. Every item can be traced, scanned, uploaded, and assigned a QR label.</p>
+                  <p class="sub">BatchTrack Pro stores retailer, consumer, billing-machine, product, and survey records in Supabase. Every item can be traced, scanned, uploaded, and assigned a dual-code label.</p>
                   <div class="cta-row">
                     <button class="btn primary" type="button" data-action="go-retailer-auth">Open retailer setup</button>
                     <button class="btn" type="button" data-action="go-consumer-auth">Open consumer access</button>
@@ -1127,7 +1135,7 @@
             close();
             const batchInput = document.getElementById('machine-batch');
             if (batchInput) batchInput.value = payload.batch;
-            showToast(item ? `${format || 'Code'} matched: ${item.batchNumber}` : 'Code read, but no local inventory item matched it.');
+            showToast(item ? `${format || 'Code'} matched: ${item.batchNumber}` : 'Code read, but no Supabase inventory item matched it.');
           };
 
           try {
@@ -1599,6 +1607,7 @@
         async function bootstrap() {
           applyViewMode();
           try {
+            await window.batchTrackConfigReady;
             await loadAllData();
             state.session = getSession();
             attachGlobalEvents();
@@ -1611,9 +1620,9 @@
             appNode.innerHTML = `
               <div class="app-shell">
                 <div class="auth-shell">
-                  <div class="eyebrow">Local database unavailable</div>
+                  <div class="eyebrow">Supabase unavailable</div>
                   <h1>Storage could not be opened.</h1>
-                  <p class="sub">BatchTrack could not open its persistent browser database. Keep this app on the same localhost origin and check that browser storage is enabled.</p>
+                  <p class="sub">BatchTrack could not connect to Supabase. Check the deployment environment variables and network connection, then try again.</p>
                   <button class="btn primary" type="button" onclick="location.reload()">Try again</button>
                 </div>
               </div>
