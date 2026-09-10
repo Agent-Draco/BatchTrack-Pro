@@ -36,12 +36,12 @@ BatchTrack Pro is a Supabase-backed inventory, product traceability, retailer re
 
 ## Run the App
 
-### Windows PowerShell
+### Local HTTP server
 
-1. Open PowerShell in the project folder:
+1. Open a terminal in the project folder:
 
-```powershell
-cd M:\DevProjects-B1\Eureka_codes
+```bash
+cd /workspaces/BatchTrack-Pro
 ```
 
 2. Start the local HTTP server:
@@ -56,9 +56,9 @@ python -m http.server 8000
 http://localhost:8000/index.html
 ```
 
-Keep the PowerShell window running while using the app. Stop the server with `Ctrl+C`.
+Keep the terminal running while using the app. Stop the server with `Ctrl+C`.
 
-Do not open `index0.html` directly with a `file://` URL. The application loads the database adapter and external browser libraries through HTTP, and camera access is more reliable from a local HTTP origin.
+Do not open the pages directly with a `file://` URL. The application loads the database adapter and external browser libraries through HTTP, and camera access is more reliable from a local HTTP origin.
 
 ## Main Workflows
 
@@ -78,24 +78,28 @@ Do not open `index0.html` directly with a `file://` URL. The application loads t
 1. Select **Consumer login** or create a consumer account.
 2. Sign in using the phone number or email and password.
 3. View the credit balance and purchase ledger.
-4. Use the QR scanner when a product record needs to be inspected.
+4. Use the Aztec scanner to add products to Trackly. Official purchases link their tax invoice and RAD history; unmatched scans create standalone tracked items.
 
 ### Billing Machine
 
 1. Create a billing machine from a retailer account.
 2. Sign in using the saved machine code and password.
 3. Enter or scan products, enter the consumer phone number, and add items to the cart.
-4. Finalize the sale to create a transaction and issue the retailer's configured credit to the consumer account.
+4. Finalize the sale to create a transaction, invoice, RAD dossiers, inventory decrement, reward credit, and any petty-cash change debt.
+
+### Survey
+
+Open `http://localhost:8000/form.html` to collect responses. Each submission downloads a CSV copy and inserts the response into the Supabase `survey_responses` table.
 
 ## Inventory Upload Schema
 
 The first worksheet is read from row 2. The columns are expected in this order:
 
 ```text
-Batch number | Quantity | Price | Expiry | Warranty | Mfg date | Mfg place | Warranty number
+Batch Number | Quantity | Price | Expiry | Warranty Months | Mfg Date | Category | WADN
 ```
 
-Rows without a batch number are ignored. Uploaded records are saved to the retailer's local inventory table.
+Rows without a batch number are ignored. Categories are normalized to `pharma`, `consumables`, or `electronics`. A blank WADN is generated as `WADN-<BATCH>-<INDEX>`.
 
 ## Supabase Database
 
@@ -106,6 +110,9 @@ The application uses Supabase tables through the adapter in [database/local-db.j
 - `machines`
 - `inventory`
 - `transactions`
+- `documents`
+- `credit_notes`
+- `support_tickets`
 - `sessions`
 - `survey_responses`
 
@@ -121,6 +128,21 @@ Data survives:
 - Switching browsers or devices
 
 The app still needs an HTTP origin for its scripts and camera access, but its records are no longer tied to browser storage.
+
+## Supabase Setup
+
+The browser uses the public Supabase URL and anon key configured for this project. The anon key is intended for browser use; never put a service-role key in HTML or `.env`.
+
+The first migration is [supabase/migrations/20260910000000_create_batchtrack_tables.sql](supabase/migrations/20260910000000_create_batchtrack_tables.sql). It creates the application tables, indexes, updated-at triggers, and prototype RLS policies.
+
+For GitHub deployment, add these repository secrets:
+
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_PROJECT_REF` = `bwiytslmkiyzdaijjtka`
+
+Pushes to `main` that touch `supabase/migrations/` run [.github/workflows/supabase-migrations.yml](.github/workflows/supabase-migrations.yml).
+
+The current prototype policies allow anonymous CRUD for application tables so the existing local sign-in flow can operate. Replace them with Supabase Auth and tenant-scoped `auth.uid()` policies before production use.
 
 ## External Browser Libraries
 
@@ -143,17 +165,11 @@ This local prototype intentionally does not include:
 - Email verification
 - Backend authentication
 - Password hashing
-- Multi-user synchronization
 - Server-side backups
-- Cloud database access
+- Server-side transaction validation
 
-Passwords are currently stored in browser-local IndexedDB for prototype operation. Do not use production credentials or sensitive customer data until a backend authentication and security layer is added.
+Passwords are still stored in the prototype's application records and are not hashed. Do not use production credentials or sensitive customer data until Supabase Auth and tenant-scoped RLS policies are enabled.
 
 ## Automatic Migrations
 
-The workflow in `.github/workflows/supabase-migrations.yml` runs `supabase db push` when migration files are pushed to `main`. Configure these GitHub repository secrets before enabling it:
-
-1. `SUPABASE_ACCESS_TOKEN`
-2. `SUPABASE_PROJECT_REF` set to `bwiytslmkiyzdaijjtka`
-
-The Supabase CLI itself is installed by the workflow, so no local compilation step is required.
+The Supabase CLI is installed by the workflow, so no local compilation step is required.
