@@ -108,7 +108,7 @@
           <div class="header-actions"><a class="text-link" href="/app">Back to app</a><button id="view-responses-button" class="text-link" type="button">View responses</button><button id="phone-mode-toggle" class="mode-button" type="button">Phone view</button></div>
         </div>
         <h1>Tell us what gets lost between shelf and home.</h1>
-        <p>Your answers will help shape Avero, Trackly, and the BatchTrack product record. There are 10 quick questions plus your name, and no account is required.</p>
+        <p>Your answers will help shape Avero, Trackly, and the BatchTrack product record. There are 9 quick questions plus your name, and no account is required.</p>
       </header>
 
       <section id="access-panel" class="access-panel" aria-labelledby="access-title">
@@ -123,7 +123,7 @@
       </section>
 
       <section class="progress" aria-label="Survey progress">
-        <div class="progress-meta"><span><strong id="answered-count">0</strong> of 11 answered</span><span id="progress-label">Start anywhere</span></div>
+        <div class="progress-meta"><span><strong id="answered-count">0</strong> of 10 answered</span><span id="progress-label">Start anywhere</span></div>
         <div class="progress-track"><span id="progress-fill"></span></div>
       </section>
 
@@ -135,95 +135,75 @@
         </fieldset>
 
         <fieldset>
-          <legend>Q2. Are you answering this survey mainly as a...</legend>
-          <label class="option"><input required type="radio" name="q1" value="Consumer/household member" /> Consumer/household member</label>
-          <label class="option"><input type="radio" name="q1" value="Retailer/shop owner" /> Retailer/shop owner</label>
-          <label class="option"><input type="radio" name="q1" value="Both" /> Both</label>
+          <legend>1. What best describes how you currently keep track of products you buy or sell?</legend>
+          <label class="option"><input required type="radio" name="q1" value="I mostly rely on memory" /> I mostly rely on memory</label>
+          <label class="option"><input type="radio" name="q1" value="I physically check the products" /> I physically check the products</label>
+          <label class="option"><input type="radio" name="q1" value="I use paper/ledger" /> I use paper/ledger</label>
+          <label class="option"><input type="radio" name="q1" value="I use digital tools such as WhatsApp, Excel, or software" /> I use digital tools such as WhatsApp, Excel, or software</label>
         </fieldset>
 
         <fieldset>
-          <legend>Q3. How do you currently keep track of products that you buy or sell?</legend>
-          <label class="option"><input required type="radio" name="q2" value="Memory" /> Memory</label>
-          <label class="option"><input type="radio" name="q2" value="Paper/physical ledger" /> Paper/physical ledger</label>
-          <label class="option"><input type="radio" name="q2" value="WhatsApp/messages" /> WhatsApp/messages</label>
-          <label class="option"><input type="radio" name="q2" value="Excel/spreadsheets" /> Excel/spreadsheets</label>
-          <label class="option"><input type="radio" name="q2" value="Billing/inventory software" /> Billing/inventory software</label>
-          <label class="option"><input type="radio" name="q2" value="Dedicated app" /> Dedicated app</label>
-          <label class="option"><input type="radio" name="q2" value="I don't systematically track them" /> I don't systematically track them</label>
+          <legend>2. Think about the last time a product you owned or stocked expired, became unusable, or could no longer be returned. What happened?</legend>
+          <label class="option"><input required type="radio" name="q2" value="I noticed it in time and used/sold it" /> I noticed it in time and used/sold it</label>
+          <label class="option"><input type="radio" name="q2" value="I noticed it late and lost its value" /> I noticed it late and lost its value</label>
+          <label class="option"><input type="radio" name="q2" value="I returned it successfully" /> I returned it successfully</label>
+          <label class="option"><input type="radio" name="q2" value="This has not happened to me" /> This has not happened to me</label>
         </fieldset>
 
         <fieldset>
-          <legend>Q4. Have you ever lost money because a product was forgotten, expired, damaged, duplicated, or could not be returned in time?</legend>
-          <label class="option"><input required type="radio" name="q3" value="Frequently" /> Frequently</label>
-          <label class="option"><input type="radio" name="q3" value="Sometimes" /> Sometimes</label>
-          <label class="option"><input type="radio" name="q3" value="Rarely" /> Rarely</label>
-          <label class="option"><input type="radio" name="q3" value="Never" /> Never</label>
+          <legend>3. In the past 6 months, have you had to throw away, discount, return late, or otherwise lose value from a product because you didn't notice its condition or deadline in time?</legend>
+          <label class="option"><input required type="radio" name="q3" value="Yes, multiple times" /> Yes, multiple times</label>
+          <label class="option"><input type="radio" name="q3" value="Yes, once or twice" /> Yes, once or twice</label>
+          <label class="option"><input type="radio" name="q3" value="No" /> No</label>
+          <label class="option"><input type="radio" name="q3" value="I am not sure" /> I am not sure</label>
         </fieldset>
 
         <fieldset>
-          <legend>Q5. How do you currently keep track of expiry dates, return deadlines, warranties, receipts or other important product information?</legend>
-          <label class="option"><input required type="radio" name="q4" value="I remember them" /> I remember them</label>
-          <label class="option"><input type="radio" name="q4" value="I check the product manually" /> I check the product manually</label>
-          <label class="option"><input type="radio" name="q4" value="Paper notes/ledger" /> Paper notes/ledger</label>
-          <label class="option"><input type="radio" name="q4" value="Phone reminders" /> Phone reminders</label>
-          <label class="option"><input type="radio" name="q4" value="App/software" /> App/software</label>
-          <label class="option"><input type="radio" name="q4" value="I generally don't track them" /> I generally don't track them</label>
+          <legend>4. Think about the last time you needed information such as an expiry date, receipt, warranty, batch number, or purchase record for a product. Where did you find it?</legend>
+          <label class="option"><input required type="radio" name="q4" value="On the product/package" /> On the product/package</label>
+          <label class="option"><input type="radio" name="q4" value="Paper receipt or bill" /> Paper receipt or bill</label>
+          <label class="option"><input type="radio" name="q4" value="Phone/WhatsApp/email" /> Phone/WhatsApp/email</label>
+          <label class="option"><input type="radio" name="q4" value="I could not find it" /> I could not find it</label>
         </fieldset>
 
         <fieldset>
-          <legend>Q6. What is the biggest reason you don't track product information more systematically?</legend>
-          <label class="option"><input required type="radio" name="q5" value="Too much manual entry" /> Too much manual entry</label>
-          <label class="option"><input type="radio" name="q5" value="I forget to update it" /> I forget to update it</label>
-          <label class="option"><input type="radio" name="q5" value="It takes too much time" /> It takes too much time</label>
-          <label class="option"><input type="radio" name="q5" value="Information is scattered" /> Information is scattered</label>
-          <label class="option"><input type="radio" name="q5" value="Existing apps/software are complicated" /> Existing apps/software are complicated</label>
-          <label class="option"><input type="radio" name="q5" value="Privacy concerns" /> Privacy concerns</label>
-          <label class="option"><input type="radio" name="q5" value="I don't think about it until there is a problem" /> I don't think about it until there is a problem</label>
+          <legend>5. When you need to know what products you currently have or stock, what do you usually do?</legend>
+          <label class="option"><input required type="radio" name="q5" value="Rely on memory" /> Rely on memory</label>
+          <label class="option"><input type="radio" name="q5" value="Physically check" /> Physically check</label>
+          <label class="option"><input type="radio" name="q5" value="Check a written or digital record" /> Check a written or digital record</label>
+          <label class="option"><input type="radio" name="q5" value="Ask someone else" /> Ask someone else</label>
         </fieldset>
 
         <fieldset>
-          <legend>Q7. For retailers: How do you currently identify products that are approaching expiry or their distributor return deadline?</legend>
-          <label class="option"><input required type="radio" name="q6" value="Manually check shelves" /> Manually check shelves</label>
-          <label class="option"><input type="radio" name="q6" value="Paper ledger" /> Paper ledger</label>
-          <label class="option"><input type="radio" name="q6" value="Excel/software" /> Excel/software</label>
-          <label class="option"><input type="radio" name="q6" value="Distributor informs me" /> Distributor informs me</label>
-          <label class="option"><input type="radio" name="q6" value="Staff memory" /> Staff memory</label>
-          <label class="option"><input type="radio" name="q6" value="We don't systematically track this" /> We don't systematically track this</label>
+          <legend>6. For retailers: Think about the last time you ordered stock from a distributor. How did you place the order, and what happened to your inventory records afterwards?</legend>
+          <label class="option"><input required type="radio" name="q6" value="WhatsApp, then updated inventory separately" /> WhatsApp, then updated inventory separately</label>
+          <label class="option"><input type="radio" name="q6" value="Phone/in person, then updated inventory separately" /> Phone/in person, then updated inventory separately</label>
+          <label class="option"><input type="radio" name="q6" value="Distributor app/software" /> Distributor app/software</label>
+          <label class="option"><input type="radio" name="q6" value="I do not maintain inventory records" /> I do not maintain inventory records</label>
         </fieldset>
 
         <fieldset>
-          <legend>Q8. For retailers: How do you usually place orders with distributors/suppliers?</legend>
-          <label class="option"><input required type="radio" name="q7" value="WhatsApp" /> WhatsApp</label>
-          <label class="option"><input type="radio" name="q7" value="Phone call" /> Phone call</label>
-          <label class="option"><input type="radio" name="q7" value="In person" /> In person</label>
-          <label class="option"><input type="radio" name="q7" value="SMS" /> SMS</label>
-          <label class="option"><input type="radio" name="q7" value="Distributor app/software" /> Distributor app/software</label>
-          <label class="option"><input type="radio" name="q7" value="Other" /> Other</label>
+          <legend>7. For consumers: Think about the last time you bought something you already had at home. Why did you buy it again?</legend>
+          <label class="option"><input required type="radio" name="q7" value="I forgot I already had it" /> I forgot I already had it</label>
+          <label class="option"><input type="radio" name="q7" value="I did not know how much was left" /> I did not know how much was left</label>
+          <label class="option"><input type="radio" name="q7" value="I could not find the existing product" /> I could not find the existing product</label>
+          <label class="option"><input type="radio" name="q7" value="This has not happened to me" /> This has not happened to me</label>
         </fieldset>
 
         <fieldset>
-          <legend>Q9. Have you ever bought a product you already had at home because you forgot you had it?</legend>
-          <label class="option"><input required type="radio" name="q8" value="Frequently" /> Frequently</label>
-          <label class="option"><input type="radio" name="q8" value="Sometimes" /> Sometimes</label>
-          <label class="option"><input type="radio" name="q8" value="Rarely" /> Rarely</label>
-          <label class="option"><input type="radio" name="q8" value="Never" /> Never</label>
+          <legend>8. When managing products, what part is the most difficult or time-consuming for you?</legend>
+          <label class="option"><input required type="radio" name="q8" value="Remembering what I have" /> Remembering what I have</label>
+          <label class="option"><input type="radio" name="q8" value="Checking expiry dates/deadlines" /> Checking expiry dates/deadlines</label>
+          <label class="option"><input type="radio" name="q8" value="Updating records" /> Updating records</label>
+          <label class="option"><input type="radio" name="q8" value="Finding receipts, warranties, or other information" /> Finding receipts, warranties, or other information</label>
         </fieldset>
 
         <fieldset>
-          <legend>Q10. Have you ever discovered a food, medicine, cosmetic or household product only after it had expired or was no longer usable?</legend>
-          <label class="option"><input required type="radio" name="q9" value="Frequently" /> Frequently</label>
-          <label class="option"><input type="radio" name="q9" value="Sometimes" /> Sometimes</label>
-          <label class="option"><input type="radio" name="q9" value="Rarely" /> Rarely</label>
-          <label class="option"><input type="radio" name="q9" value="Never" /> Never</label>
-        </fieldset>
-
-        <fieldset>
-          <legend>Q11. How useful would a system be that lets you scan a product once and automatically creates a digital record containing relevant information such as expiry, batch, purchase date, stock/ownership and reminders?</legend>
-          <label class="option"><input required type="radio" name="q10" value="Extremely useful" /> Extremely useful</label>
-          <label class="option"><input type="radio" name="q10" value="Very useful" /> Very useful</label>
-          <label class="option"><input type="radio" name="q10" value="Moderately useful" /> Moderately useful</label>
-          <label class="option"><input type="radio" name="q10" value="Slightly useful" /> Slightly useful</label>
-          <label class="option"><input type="radio" name="q10" value="Not useful" /> Not useful</label>
+          <legend>9. If you could change one thing about how products are currently tracked, bought, stored, returned, or managed, what would you change?</legend>
+          <label class="option"><input required type="radio" name="q9" value="Make tracking automatic" /> Make tracking automatic</label>
+          <label class="option"><input type="radio" name="q9" value="Make product information easier to access" /> Make product information easier to access</label>
+          <label class="option"><input type="radio" name="q9" value="Reduce manual work" /> Reduce manual work</label>
+          <label class="option"><input type="radio" name="q9" value="Make expiry, returns, and warranties easier to manage" /> Make expiry, returns, and warranties easier to manage</label>
         </fieldset>
 
         <div class="submit-panel">
@@ -335,7 +315,7 @@
         accessPassword.value = '';
         const rows = payload.responses || [];
         accessStatus.textContent = `${rows.length} response${rows.length === 1 ? '' : 's'} loaded.`;
-        responseResults.innerHTML = `<table><thead><tr><th>Submitted</th><th>Name</th>${Array.from({ length: 10 }, (_, index) => `<th>Q${index + 1}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(new Date(row.submitted_at || row.created_at).toLocaleString())}</td><td>${escapeHtml(row.response?.respondentName || '')}</td>${Array.from({ length: 10 }, (_, index) => `<td>${escapeHtml(row.response?.['q' + (index + 1)] || '')}</td>`).join('')}</tr>`).join('') || '<tr><td colspan="12">No responses yet.</td></tr>'}</tbody></table>`;
+        responseResults.innerHTML = `<table><thead><tr><th>Submitted</th><th>Name</th>${Array.from({ length: 9 }, (_, index) => `<th>Q${index + 1}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(new Date(row.submitted_at || row.created_at).toLocaleString())}</td><td>${escapeHtml(row.response?.respondentName || '')}</td>${Array.from({ length: 9 }, (_, index) => `<td>${escapeHtml(row.response?.['q' + (index + 1)] || '')}</td>`).join('')}</tr>`).join('') || '<tr><td colspan="11">No responses yet.</td></tr>'}</tbody></table>`;
         responseResults.classList.remove('hidden');
       });
       updateProgress();
@@ -351,7 +331,7 @@
         status.textContent = 'Saving securely...';
         const data = new FormData(form);
         const response = { submittedAt: new Date().toISOString(), respondentName: data.get('respondentName') || '' };
-        for (let index = 1; index <= 10; index += 1) response['q' + index] = data.get('q' + index) || '';
+        for (let index = 1; index <= 9; index += 1) response['q' + index] = data.get('q' + index) || '';
         const batchTrackSupabase = await batchTrackConfigReady;
         const { error } = await batchTrackSupabase.from('survey_responses').insert({
           id: crypto.randomUUID(),
