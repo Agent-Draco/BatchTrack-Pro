@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Avero — Retailer Operating System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/common.css" />
+    <style>
+      :root {
+        --bg: #f4f6f0;
+        --panel: #fffdf9;
+        --panel-alt: #e9efe7;
+        --ink: #14221b;
+        --muted: #536259;
+        --line: #ced8cc;
+        --brand: #173d35;
+        --brand-2: #0e2923;
+        --brand-accent: #f5d65c;
+        --accent: #e56b38;
+        --success: #1b7a4b;
+        --warning: #b47a12;
+        --danger: #b93c32;
+        --shadow: 0 18px 45px rgba(20, 34, 27, 0.08);
+      }
+      .brand-mark {
+        background: var(--brand);
+        color: var(--brand-accent);
+      }
+      .summary-card::after {
+        background: var(--brand);
+      }
+      .nav-links button.active {
+        color: var(--brand);
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="toast" class="toast"></div>
+
+    <!-- External libraries for Avero: SheetJS, QRCode, jsPDF, bwip-js, jsQR, Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.0.0/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bwip-js@4.5.1/dist/bwip-js-min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/common.js"></script>
+    <script src="database/local-db.js"></script>
+
+    <script>
+      (function () {
+        'use strict';
+
+        const {
+          escapeHtml,
+          formatCurrency,
+          initials,
+          showToast,
+          uid,
+          normalizeCategory,
+          modeControl,
+          loadAllData,
+          writeTable,
+          startQrScanner,
+          warrantyExpiry,
+          aztecPayload,
+          qrPayload
+        } = window.BatchTrackCommon;
+
+        const state = {
+          role: 'retailer', // 'retailer' or 'machine'
+          authMode: 'signin',
+          session: null,
+          data: null,
+          retailerPage: 'overview',
+          retailer: null,
+          machine: null
+        };
+
+        const appNode = document.getElementById('app');
+
+        function getAveroSession() {
+          try {
+            const raw = localStorage.getItem('avero_session') || localStorage.getItem('batchtrack_session');
+            const s = JSON.parse(raw || 'null');
+            if (s && (s.role === 'retailer' || s.role === 'machine')) return s;
+            return null;
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function saveAveroSession(session) {
+          if (session) {
+            localStorage.setItem('avero_session', JSON.stringify(session));
+            localStorage.setItem('batchtrack_session', JSON.stringify(session));
+          } else {
+            localStorage.removeItem('avero_session');
+            const s = JSON.parse(localStorage.getItem('batchtrack_session') || 'null');
+            if (s && (s.role === 'retailer' || s.role === 'machine')) {
+              localStorage.removeItem('batchtrack_session');
+            }
+          }
+        }
+
+        // ==========================================
+        // AUTHENTICATION (Retailer & Billing Machine)
+        // ==========================================
+
+        function renderAuth() {
+          const authPanel = state.authMode === 'signin' ? `
+            <div class="card auth-card">
+              <h2>${state.role === 'machine' ? 'Cashier Station Sign In' : 'Retailer Sign In'}</h2>
+              <p class="tiny">${state.role === 'machine' ? 'Enter the machine code and station password.' : 'Access your store inventory, rewards, and billing stations.'}</p>
+              <form id="avero-signin-form">
+                <div class="field">
+                  <label for="avero-auth-id">${state.role === 'machine' ? 'Machine Station Code' : 'Store Email or Phone'}</label>
+                  <input id="avero-auth-id" placeholder="${state.role === 'machine' ? 'POS-01' : 'owner@shop.com'}" required />
+                </div>
+                <div class="field">
+                  <label for="avero-auth-pass">Password</label>
+                  <input id="avero-auth-pass" type="password" placeholder="••••••••" required />
+                </div>
+                <button class="btn primary" type="submit" style="width:100%; margin-top:8px;">
+                  Sign in to ${state.role === 'machine' ? 'POS Station' : 'Avero'}
+                </button>
+              </form>
+            </div>
+          ` : `
+            <div class="card auth-card">
+              <h2>Register Retail Store</h2>
+              <p class="tiny">Set up your merchant operating profile on Avero.</p>
+              <form id="avero-signup-form">
+                <div class="field">
+                  <label for="avero-name">Store Name / Merchant Name</label>
+                  <input id="avero-name" placeholder="Metro Supermart" required />
+                </div>
+                <div class="field">
+                  <label for="avero-phone">Contact Phone</label>
+                  <input id="avero-phone" placeholder="+91 98..." required />
+                </div>
+                <div class="field">
+                  <label for="avero-email">Email Address</label>
+                  <input id="avero-email" type="email" placeholder="store@example.com" />
+                </div>
+                <div class="field">
+                  <label for="avero-password">Create Password</label>
+                  <input id="avero-password" type="password" placeholder="Create password" minlength="4" required />
+                </div>
+                <button class="btn success" type="submit" style="width:100%; margin-top:8px;">
+                  Create Merchant Account
+                </button>
+              </form>
+            </div>
+          `;
+
+          appNode.innerHTML = `
+            <div class="app-shell">
+              <nav class="nav">
+                <div class="brand">
+                  <span class="brand-mark">A</span>
+                  <div>
+                    <div>Avero</div>
+                    <span class="brand-sub">Retailer Operating System &middot; by BatchTrack</span>
+                  </div>
+                </div>
+                <div class="nav-links">
+                  ${modeControl()}
+                  <a class="nav-action parent-link" href="index.html">&larr; BatchTrack</a>
+                </div>
+              </nav>
+
+              <div class="auth-shell">
+                <div class="auth-intro">
+                  <div class="eyebrow">Retailer Operating System</div>
+                  <h1>Store Workspace Access</h1>
+                  <p>Manage batch inventory, dual-code labels, customer change credits, and multi-lane checkout stations.</p>
+                </div>
+
+                <div class="auth-switch">
+                  <button class="seg ${state.role === 'retailer' ? 'active' : ''}" type="button" data-role="retailer">
+                    Retailer / Store Owner
+                  </button>
+                  <button class="seg ${state.role === 'machine' ? 'active' : ''}" type="button" data-role="machine">
+                    Billing Machine POS
+                  </button>
+                </div>
+
+                ${state.role === 'retailer' ? `
+                  <div class="mode-switch" aria-label="Account action">
+                    <button class="${state.authMode === 'signin' ? 'active' : ''}" type="button" data-auth-mode="signin">Sign In</button>
+                    <button class="${state.authMode === 'signup' ? 'active' : ''}" type="button" data-auth-mode="signup">Register Store</button>
+                  </div>
+                ` : ''}
+
+                ${authPanel}
+              </div>
+            </div>
+          `;
+
+          bindAuthEvents();
+        }
+
+        function bindAuthEvents() {
+          document.querySelectorAll('[data-role]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              state.role = btn.dataset.role;
+              if (state.role === 'machine') state.authMode = 'signin';
+              renderAuth();
+            });
+          });
+
+          document.querySelectorAll('[data-auth-mode]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              state.authMode = btn.dataset.authMode;
+              renderAuth();
+            });
+          });
+
+          document.getElementById('avero-signin-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const identifier = document.getElementById('avero-auth-id').value.trim();
+            const password = document.getElementById('avero-auth-pass').value;
+
+            if (!identifier || !password) {
+              showToast('Complete all fields.');
+              return;
+            }
+
+            try {
+              state.data = await loadAllData();
+
+              if (state.role === 'retailer') {
+                const retailer = state.data.retailers.find(
+                  (item) => (item.email === identifier || item.phone === identifier) && item.password === password
+                );
+                if (!retailer) {
+                  showToast('Retailer login failed. Check credentials.');
+                  return;
+                }
+                state.session = { role: 'retailer', userId: retailer.id };
+                state.retailer = retailer;
+                saveAveroSession(state.session);
+                renderRetailerDashboard(retailer);
+                return;
+              }
+
+              if (state.role === 'machine') {
+                const machine = state.data.machines.find(
+                  (item) => (item.code === identifier || item.name === identifier) && item.password === password
+                );
+                if (!machine) {
+                  showToast('Billing station code or password incorrect.');
+                  return;
+                }
+                state.session = { role: 'machine', userId: machine.id };
+                state.machine = machine;
+                saveAveroSession(state.session);
+                renderMachineDashboard(machine);
+              }
+            } catch (err) {
+              console.error(err);
+              showToast('Database connection failed.');
+            }
+          });
+
+          document.getElementById('avero-signup-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('avero-name').value.trim();
+            const phone = document.getElementById('avero-phone').value.trim();
+            const email = document.getElementById('avero-email').value.trim();
+            const password = document.getElementById('avero-password').value;
+
+            if (!name || !phone || !password) {
+              showToast('Name, phone, and password are required.');
+              return;
+            }
+
+            try {
+              const retailer = {
+                id: uid(),
+                name,
+                storeName: name,
+                email: email || `${name.replace(/\s+/g, '').toLowerCase()}@shop.local`,
+                phone,
+                password,
+                gstin: '27XXXXXX',
+                address: 'Store address',
+                rewards: { percentage: 4, fixedCredit: 25, minSpend: 0 },
+                createdAt: new Date().toISOString()
+              };
+
+              await writeTable('retailers', retailer);
+              state.session = { role: 'retailer', userId: retailer.id };
+              state.retailer = retailer;
+              saveAveroSession(state.session);
+              showToast(`Store profile registered for ${name}!`);
+              renderRetailerDashboard(retailer);
+            } catch (err) {
+              console.error(err);
+              showToast('Could not register retailer profile.');
+            }
+          });
+        }
+
+        // ==========================================
+        // RETAILER DASHBOARD
+        // ==========================================
+
+        async function renderRetailerDashboard(retailer, page = 'overview') {
+          state.retailer = retailer;
+          state.retailerPage = page;
+          state.data = await loadAllData();
+
+          const inventory = state.data.inventory.filter((item) => item.retailerId === retailer.id);
+          const transactions = state.data.transactions.filter((item) => item.retailerId === retailer.id);
+          const machines = state.data.machines.filter((item) => item.retailerId === retailer.id);
+          const totalValue = inventory.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
+          const qtyUnits = inventory.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+          const rewardsIssued = transactions.reduce((sum, item) => sum + Number(item.creditAmount || 0), 0);
+
+          const navMarkup = `
+            <nav class="nav">
+              <div class="brand">
+                <span class="brand-mark">A</span>
+                <div>
+                  <div>${escapeHtml(retailer.storeName || retailer.name)}</div>
+                  <span class="brand-sub">Avero Retailer OS</span>
+                </div>
+              </div>
+              <div class="nav-links">
+                ${modeControl()}
+                <button type="button" class="${page === 'overview' ? 'active' : ''}" data-action="retail-home">Overview</button>
+                <button type="button" class="${page === 'inventory' ? 'active' : ''}" data-action="retail-inventory">Inventory</button>
+                <button type="button" class="${page === 'profile' ? 'active' : ''}" data-action="retail-profile">Profile</button>
+                <button type="button" class="${page === 'billing' ? 'active' : ''}" data-action="retail-billing">Billing Stations</button>
+                <button type="button" class="${page === 'tickets' ? 'active' : ''}" data-action="retail-tickets">Service Tickets</button>
+                <a class="nav-action parent-link" href="index.html">&larr; BatchTrack</a>
+                <button type="button" data-action="logout">Logout</button>
+              </div>
+            </nav>
+          `;
+
+          if (page === 'overview') {
+            appNode.innerHTML = `
+              <div class="app-shell">
+                ${navMarkup}
+                <div class="dashboard">
+                  <div class="summary">
+                    <div class="summary-card">
+                      <span class="k">Batches In Stock</span>
+                      <strong>${inventory.length}</strong>
+                      <small>${qtyUnits} total units tracked</small>
+                    </div>
+                    <div class="summary-card">
+                      <span class="k">Ledger Value</span>
+                      <strong>₹${formatCurrency(totalValue)}</strong>
+                      <small>at current retail prices</small>
+                    </div>
+                    <div class="summary-card">
+                      <span class="k">Rewards Issued</span>
+                      <strong>₹${formatCurrency(rewardsIssued)}</strong>
+                      <small>across ${transactions.length} sales</small>
+                    </div>
+                    <div class="summary-card">
+                      <span class="k">Active Stations</span>
+                      <strong>${machines.length}</strong>
+                      <small>connected POS devices</small>
+                    </div>
+                  </div>
+
+                  <div class="workspace">
+                    <div class="section">
+                      <div class="section-head">
+                        <div>
+                          <h3>Inventory Ingestion</h3>
+                          <div class="tiny">Upload inventory spreadsheet and generate Aztec + QR print labels</div>
+                        </div>
+                        <button class="btn primary" type="button" id="trigger-upload">Upload CSV / XLSX</button>
+                      </div>
+                      <input id="inventory-upload" class="hidden" type="file" accept=".csv,.xlsx,.xls" />
+                      <div class="schema-box">
+                        <strong>Expected 8-column header (data reads from row 2):</strong>
+                        <code>Batch Number | Quantity | Price | Expiry | Warranty Months | Mfg Date | Category | WADN</code>
+                      </div>
+                      <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">
+                        <button id="generate-qr-pdf" class="btn success" type="button">Generate QR + Aztec PDF</button>
+                        <button id="create-machine" class="btn warn" type="button">Create Billing Station</button>
+                      </div>
+                    </div>
+
+                    <div class="section">
+                      <div class="section-head">
+                        <h3>Store Rewards</h3>
+                      </div>
+                      <div class="list">
+                        <div class="row-item">
+                          <div class="row-meta">
+                            <div class="avatar">${initials(retailer.storeName || retailer.name)}</div>
+                            <div>
+                              <div style="font-weight:800;">${escapeHtml(retailer.storeName || retailer.name)}</div>
+                              <div class="tiny">${escapeHtml(retailer.email)}</div>
+                            </div>
+                          </div>
+                          <span class="pill blue">Primary Store</span>
+                        </div>
+                      </div>
+                      <div class="field" style="margin-top:16px;">
+                        <label for="reward-percent">Reward % on Sales</label>
+                        <input id="reward-percent" type="number" value="${retailer.rewards?.percentage ?? 4}" />
+                      </div>
+                      <div class="field">
+                        <label for="reward-fixed">Fixed Credit per Sale (₹)</label>
+                        <input id="reward-fixed" type="number" value="${retailer.rewards?.fixedCredit ?? 25}" />
+                      </div>
+                      <button id="save-reward-settings" class="btn primary" type="button" style="width:100%;">
+                        Save Reward Rules
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="section">
+                    <div class="section-head">
+                      <h3>Uploaded Inventory</h3>
+                      <button class="btn" type="button" data-action="retail-inventory">View full inventory</button>
+                    </div>
+                    <div class="table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Batch</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                            <th>Expiry</th>
+                            <th>Warranty</th>
+                            <th>Mfg. Place</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${inventory.length ? inventory.slice(0, 10).map((item) => `
+                            <tr>
+                              <td><strong>${escapeHtml(item.batchNumber)}</strong></td>
+                              <td>${Number(item.quantity || 0)}</td>
+                              <td>₹${formatCurrency(Number(item.price || 0))}</td>
+                              <td>${escapeHtml(item.expiry || '—')}</td>
+                              <td>${escapeHtml(item.warranty || '—')}</td>
+                              <td>${escapeHtml(item.mfgPlace || '—')}</td>
+                              <td><button class="btn" type="button" data-scan-batch="${escapeHtml(item.batchNumber)}">Scan</button></td>
+                            </tr>
+                          `).join('') : '<tr><td colspan="7">No inventory uploaded yet. Upload a CSV or XLSX to begin.</td></tr>'}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+          } else {
+            // Other pages: inventory, profile, billing, tickets
+            const pageTitle = page === 'inventory' ? 'Inventory Records'
+              : page === 'profile' ? 'Store Profile & Reward Policy'
+              : page === 'tickets' ? 'RAD Service Queue' : 'Connected POS Stations';
+            const pageDesc = page === 'inventory'
+              ? 'Bulk upload stock sheets, print dual Aztec & QR labels, and audit batches.'
+              : page === 'profile'
+              ? 'Configure your merchant details and the credit policy awarded on sales.'
+              : page === 'tickets'
+              ? 'Review incoming customer repair requests with verified WADN and invoice dossiers.'
+              : 'Add and authorize multi-station cashier terminals for front counter checkouts.';
+
+            appNode.innerHTML = `
+              <div class="app-shell">
+                ${navMarkup}
+                <div class="dashboard">
+                  <div class="auth-intro">
+                    <div class="eyebrow">Avero Operating Workspace</div>
+                    <h1>${pageTitle}</h1>
+                    <p>${pageDesc}</p>
+                  </div>
+
+                  ${page === 'inventory' ? `
+                    <div class="section">
+                      <div class="section-head">
+                        <h3>Inventory Management</h3>
+                        <button class="btn primary" type="button" id="trigger-upload">Upload CSV / XLSX</button>
+                      </div>
+                      <input id="inventory-upload" class="hidden" type="file" accept=".csv,.xlsx,.xls" />
+                      <div class="schema-box">
+                        <strong>Upload schema: starts reading from row 2</strong>
+                        <code>Batch Number | Quantity | Price | Expiry | Warranty Months | Mfg Date | Category | WADN</code>
+                      </div>
+                      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
+                        <button id="generate-qr-pdf" class="btn success" type="button">Generate QR + Aztec PDF</button>
+                        <span class="pill blue">${inventory.length} saved batches</span>
+                      </div>
+                    </div>
+
+                    <div class="section">
+                      <div class="section-head"><h3>All Batches</h3></div>
+                      <div class="table-wrap">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Batch Number</th>
+                              <th>WADN</th>
+                              <th>Category</th>
+                              <th>Qty</th>
+                              <th>Price</th>
+                              <th>Expiry</th>
+                              <th>Warranty</th>
+                              <th>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${inventory.length ? inventory.map((item) => `
+                              <tr>
+                                <td><strong>${escapeHtml(item.batchNumber)}</strong></td>
+                                <td><span class="tiny">${escapeHtml(item.wadn || '—')}</span></td>
+                                <td><span class="pill blue">${escapeHtml(item.category || 'consumables')}</span></td>
+                                <td>${Number(item.quantity || 0)}</td>
+                                <td>₹${formatCurrency(item.price || 0)}</td>
+                                <td>${escapeHtml(item.expiry || '—')}</td>
+                                <td>${escapeHtml(item.warranty || '—')}</td>
+                                <td><button class="btn" type="button" data-scan-batch="${escapeHtml(item.batchNumber)}">Scan</button></td>
+                              </tr>
+                            `).join('') : '<tr><td colspan="8">No inventory uploaded yet.</td></tr>'}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ` : page === 'profile' ? `
+                    <div class="workspace">
+                      <div class="section">
+                        <div class="section-head"><h3>Merchant Identity</h3></div>
+                        <div class="row-item">
+                          <div class="row-meta">
+                            <div class="avatar">${initials(retailer.storeName || retailer.name)}</div>
+                            <div>
+                              <strong>${escapeHtml(retailer.storeName || retailer.name)}</strong>
+                              <div class="tiny">${escapeHtml(retailer.email)}</div>
+                            </div>
+                          </div>
+                          <span class="pill blue">Primary Store</span>
+                        </div>
+                        <div class="field" style="margin-top:16px;"><label>Phone</label><input value="${escapeHtml(retailer.phone)}" readonly /></div>
+                        <div class="field"><label>GSTIN</label><input value="${escapeHtml(retailer.gstin || '27XXXXXX')}" readonly /></div>
+                        <div class="field"><label>Store Address</label><textarea readonly>${escapeHtml(retailer.address || 'No address saved')}</textarea></div>
+                      </div>
+                      <div class="section">
+                        <div class="section-head"><h3>Reward & Credit Policy</h3></div>
+                        <p class="tiny">This rule is executed by all connected cashier POS stations when ringing up sales.</p>
+                        <div class="field"><label>Reward % on Sale Total</label><input id="reward-percent" type="number" value="${retailer.rewards?.percentage ?? 4}" min="0" step="0.1" /></div>
+                        <div class="field"><label>Fixed Credit (₹)</label><input id="reward-fixed" type="number" value="${retailer.rewards?.fixedCredit ?? 25}" min="0" step="1" /></div>
+                        <button id="save-reward-settings" class="btn primary" type="button" style="width:100%;">Save Policy Settings</button>
+                      </div>
+                    </div>
+                  ` : page === 'tickets' ? `
+                    <div class="section">
+                      <div class="section-head">
+                        <h3>RAD Service Queue</h3>
+                        <span class="pill blue">${state.data.supportTickets.filter((t) => t.retailerId === retailer.id).length} tickets</span>
+                      </div>
+                      <div class="list">
+                        ${state.data.supportTickets.filter((t) => t.retailerId === retailer.id).map((ticket) => {
+                          const docMatch = state.data.documents.find(
+                            (doc) => doc.retailerId === retailer.id && (doc.radDossiers || []).some((rad) => rad.wadn === ticket.wadn)
+                          );
+                          const rad = docMatch?.radDossiers?.find((entry) => entry.wadn === ticket.wadn);
+                          return `
+                            <div class="row-item">
+                              <div>
+                                <strong>WADN: ${escapeHtml(ticket.wadn || 'Unknown')}</strong>
+                                <div class="tiny">${escapeHtml(ticket.category)} &middot; ${escapeHtml(ticket.description)} &middot; Consumer: ${escapeHtml(ticket.consumerPhone)}</div>
+                                <div class="tiny" style="color:var(--brand); font-weight:600;">Verification: ${escapeHtml(rad?.verificationStatus || 'Unlinked / Offline')} &middot; Purchased: ${escapeHtml(rad?.purchaseDate ? new Date(rad.purchaseDate).toLocaleDateString() : '—')}</div>
+                              </div>
+                              <span class="pill ${ticket.status === 'open' ? 'red' : 'green'}">${escapeHtml(ticket.status)}</span>
+                            </div>
+                          `;
+                        }).join('') || '<div class="tiny">No incoming service tickets.</div>'}
+                      </div>
+                    </div>
+                  ` : `
+                    <div class="section">
+                      <div class="section-head">
+                        <h3>Connected POS Stations</h3>
+                        <button id="create-machine" class="btn warn" type="button">Create Billing Station</button>
+                      </div>
+                      <div class="list">
+                        ${machines.length ? machines.map((machine) => `
+                          <div class="row-item">
+                            <div>
+                              <strong>${escapeHtml(machine.name)}</strong>
+                              <div class="tiny">Station Code: <code>${escapeHtml(machine.code)}</code> &middot; Password Configured</div>
+                            </div>
+                            <span class="pill green">Active</span>
+                          </div>
+                        `).join('') : '<div class="tiny">No billing stations connected yet. Create a station code for cashiers.</div>'}
+                      </div>
+                    </div>
+                  `}
+                </div>
+              </div>
+            `;
+          }
+
+          bindRetailerActions(retailer);
+        }
+
+        function openMachineSetup(retailer) {
+          const modal = document.createElement('div');
+          modal.className = 'setup-modal';
+          modal.innerHTML = `
+            <div class="setup-card">
+              <div class="section-head">
+                <div>
+                  <div class="eyebrow">Cashier Terminal Setup</div>
+                  <h2 style="margin:12px 0 0;">Connect a Billing Machine</h2>
+                </div>
+                <button class="btn" type="button" data-close-machine-setup>Close</button>
+              </div>
+              <p class="tiny">The machine code is the login identifier used by the cashier at this checkout lane.</p>
+              <form id="machine-setup-form">
+                <div class="field">
+                  <label for="setup-machine-name">Station Name</label>
+                  <input id="setup-machine-name" placeholder="Front Counter POS" required />
+                </div>
+                <div class="field">
+                  <label for="setup-machine-code">Station Code (Login ID)</label>
+                  <input id="setup-machine-code" placeholder="POS-01" autocapitalize="characters" required />
+                </div>
+                <div class="field">
+                  <label for="setup-machine-password">Station Password</label>
+                  <input id="setup-machine-password" type="password" placeholder="Terminal password" minlength="4" required />
+                </div>
+                <button class="btn primary" type="submit" style="width:100%;">Authorize Billing Station</button>
+              </form>
+            </div>
+          `;
+          document.body.appendChild(modal);
+
+          const close = () => modal.remove();
+          modal.querySelector('[data-close-machine-setup]').addEventListener('click', close);
+          modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+          modal.querySelector('#machine-setup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = modal.querySelector('#setup-machine-name').value.trim();
+            const code = modal.querySelector('#setup-machine-code').value.trim().toUpperCase();
+            const password = modal.querySelector('#setup-machine-password').value;
+
+            if (!name || !code || password.length < 4) {
+              showToast('Enter station name, code, and a password of at least 4 characters.');
+              return;
+            }
+
+            state.data = await loadAllData();
+            if (state.data.machines.some((m) => m.code.toUpperCase() === code)) {
+              showToast('That station code is already in use.');
+              return;
+            }
+
+            const machine = {
+              id: uid(),
+              name,
+              code,
+              password,
+              retailerId: retailer.id,
+              createdAt: new Date().toISOString()
+            };
+
+            await writeTable('machines', machine);
+            close();
+            showToast(`Billing machine ${machine.code} authorized.`);
+            renderRetailerDashboard(retailer, state.retailerPage);
+          });
+        }
+
+        function bindRetailerActions(retailer) {
+          // Nav buttons
+          document.querySelector('[data-action="retail-home"]')?.addEventListener('click', () => renderRetailerDashboard(retailer, 'overview'));
+          document.querySelector('[data-action="retail-inventory"]')?.addEventListener('click', () => renderRetailerDashboard(retailer, 'inventory'));
+          document.querySelector('[data-action="retail-profile"]')?.addEventListener('click', () => renderRetailerDashboard(retailer, 'profile'));
+          document.querySelector('[data-action="retail-billing"]')?.addEventListener('click', () => renderRetailerDashboard(retailer, 'billing'));
+          document.querySelector('[data-action="retail-tickets"]')?.addEventListener('click', () => renderRetailerDashboard(retailer, 'tickets'));
+          document.querySelector('[data-action="logout"]')?.addEventListener('click', () => {
+            state.session = null;
+            saveAveroSession(null);
+            renderAuth();
+          });
+
+          // Upload CSV/XLSX
+          document.getElementById('trigger-upload')?.addEventListener('click', () => document.getElementById('inventory-upload').click());
+          document.getElementById('inventory-upload')?.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+              const arrayBuffer = await file.arrayBuffer();
+              const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+              const sheet = workbook.Sheets[workbook.SheetNames[0]];
+              const rows = XLSX.utils.sheet_to_json(sheet, { raw: false, header: 1, blankrows: false });
+
+              const parsed = rows.slice(1)
+                .filter((row) => row && row.some((cell) => String(cell ?? '').trim() !== ''))
+                .map((row, index) => {
+                  const batchNumber = String(row[0] ?? '').trim();
+                  const quantity = Number(String(row[1] ?? '0').replace(/[^0-9.]/g, '')) || 0;
+                  const price = Number(String(row[2] ?? '0').replace(/[^0-9.]/g, '')) || 0;
+                  const expiry = String(row[3] ?? '').trim();
+                  const warrantyMonths = Number(String(row[4] ?? '0').replace(/[^0-9.]/g, '')) || 0;
+                  const mfgDate = String(row[5] ?? '').trim();
+                  const category = normalizeCategory(row[6]);
+                  const wadn = String(row[7] ?? '').trim() || `WADN-${batchNumber || 'ITEM'}-${String(index + 1).padStart(3, '0')}`;
+
+                  return {
+                    id: uid(),
+                    retailerId: retailer.id,
+                    batchNumber,
+                    wadn,
+                    category,
+                    productName: batchNumber || `Inventory-${index + 1}`,
+                    quantity,
+                    price,
+                    expiry,
+                    warrantyMonths,
+                    warranty: warrantyMonths,
+                    mfgDate,
+                    createdAt: new Date().toISOString(),
+                    qrPayload: qrPayload({ wadn, batchNumber, category, expiry }),
+                    aztecPayload: aztecPayload({ wadn, category, batchNumber, price, expiry, warrantyMonths })
+                  };
+                })
+                .filter((item) => item.batchNumber);
+
+              for (const item of parsed) {
+                await writeTable('inventory', item);
+              }
+
+              showToast(`${parsed.length} inventory items imported successfully.`);
+              renderRetailerDashboard(retailer, state.retailerPage);
+            } catch (err) {
+              console.error(err);
+              showToast('Error parsing spreadsheet file.');
+            }
+          });
+
+          // Generate QR + Aztec PDF
+          document.getElementById('generate-qr-pdf')?.addEventListener('click', async () => {
+            state.data = await loadAllData();
+            const items = state.data.inventory.filter((item) => item.retailerId === retailer.id);
+            if (!items.length) {
+              showToast('Upload inventory before generating PDF.');
+              return;
+            }
+            await generateQrPdf(items, retailer);
+            showToast('QR + Aztec label sheet generated.');
+          });
+
+          // Reward settings save
+          document.getElementById('save-reward-settings')?.addEventListener('click', async () => {
+            const percentage = Number(document.getElementById('reward-percent').value || 4);
+            const fixedCredit = Number(document.getElementById('reward-fixed').value || 25);
+            retailer.rewards = { percentage, fixedCredit, minSpend: 0 };
+            await writeTable('retailers', retailer);
+            showToast('Reward rules saved.');
+            renderRetailerDashboard(retailer, state.retailerPage);
+          });
+
+          // Create billing machine
+          document.getElementById('create-machine')?.addEventListener('click', () => {
+            openMachineSetup(retailer);
+          });
+
+          // Scan batch
+          document.querySelectorAll('[data-scan-batch]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              const batch = btn.dataset.scanBatch;
+              await startQrScanner((item) => {
+                showToast(`Scanned: ${item.wadn || item.batchNumber}`);
+              });
+            });
+          });
+        }
+
+        async function generateQrPdf(items, retailer) {
+          if (!window.jspdf || !window.QRCode || !window.bwipjs) {
+            showToast('QR / Aztec / PDF libraries did not load.');
+            return;
+          }
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const itemWidth = 58;
+          let x = 14;
+          let y = 18;
+
+          for (let i = 0; i < items.length; i += 1) {
+            const item = items[i];
+            const qrDataUrl = await QRCode.toDataURL(qrPayload(item), { width: 240, margin: 1 });
+            const aztecCanvas = document.createElement('canvas');
+            bwipjs.toCanvas(aztecCanvas, {
+              bcid: 'azteccode',
+              text: aztecPayload(item),
+              scale: 3,
+              padding: 2,
+              includetext: false
+            });
+            const aztecDataUrl = aztecCanvas.toDataURL('image/png');
+
+            pdf.addImage(aztecDataUrl, 'PNG', x, y, 25, 25);
+            pdf.addImage(qrDataUrl, 'PNG', x + 27, y, 25, 25);
+            pdf.setFontSize(8);
+            pdf.setTextColor(17, 32, 51);
+            pdf.text('AZTEC', x + 12.5, y + 29, { align: 'center' });
+            pdf.text('QR', x + 39.5, y + 29, { align: 'center' });
+            pdf.setFontSize(7);
+            pdf.text(`WADN: ${(item.wadn || '').slice(0, 18)}`, x, y + 36, { maxWidth: 54 });
+            pdf.text(`Category: ${normalizeCategory(item.category)}`, x, y + 41, { maxWidth: 54 });
+            pdf.text(`Batch: ${(item.batchNumber || '').slice(0, 16)}`, x, y + 46, { maxWidth: 54 });
+            pdf.text(`Expiry: ${item.expiry || '—'}`, x, y + 51, { maxWidth: 54 });
+
+            if ((i + 1) % 4 === 0) {
+              x = 14;
+              y += 56;
+              if (y > 180) {
+                pdf.addPage();
+                x = 14;
+                y = 18;
+              }
+            } else {
+              x += itemWidth + 6;
+              if (x > pageWidth - 32) {
+                x = 14;
+                y += 56;
+                if (y > 180) {
+                  pdf.addPage();
+                  x = 14;
+                  y = 18;
+                }
+              }
+            }
+          }
+
+          pdf.save(`avero-labels-${retailer.storeName || 'inventory'}.pdf`);
+        }
+
+        // ==========================================
+        // BILLING MACHINE (POS Cashier Station)
+        // ==========================================
+
+        async function renderMachineDashboard(machine) {
+          state.machine = machine;
+          state.data = await loadAllData();
+          const retailer = state.data.retailers.find((item) => item.id === machine.retailerId);
+
+          appNode.innerHTML = `
+            <div class="app-shell">
+              <nav class="nav">
+                <div class="brand">
+                  <span class="brand-mark">A</span>
+                  <div>
+                    <div>${escapeHtml(machine.name || 'POS Station')}</div>
+                    <span class="brand-sub">Avero Cashier &middot; Code: ${escapeHtml(machine.code)}</span>
+                  </div>
+                </div>
+                <div class="nav-links">
+                  ${modeControl()}
+                  <a class="nav-action parent-link" href="index.html">&larr; BatchTrack</a>
+                  <button type="button" data-action="logout">Logout</button>
+                </div>
+              </nav>
+
+              <div class="dashboard">
+                <div class="workspace">
+                  <!-- Left: Item entry -->
+                  <div class="section">
+                    <div class="section-head">
+                      <div>
+                        <h3>POS Ring-Up</h3>
+                        <div class="tiny">Terminal linked to: <strong>${escapeHtml(retailer?.storeName || retailer?.name || 'Store')}</strong></div>
+                      </div>
+                    </div>
+
+                    <div class="field">
+                      <label for="machine-phone">Customer Phone Number</label>
+                      <input id="machine-phone" placeholder="+91 98..." required />
+                    </div>
+
+                    <div class="field">
+                      <label for="machine-batch">Batch Number / Barcode</label>
+                      <input id="machine-batch" placeholder="Scan or enter batch" />
+                    </div>
+
+                    <div class="two-col">
+                      <div class="field">
+                        <label for="machine-category">Category</label>
+                        <select id="machine-category">
+                          <option value="consumables">Consumables</option>
+                          <option value="pharma">Pharma</option>
+                          <option value="electronics">Electronics</option>
+                        </select>
+                      </div>
+                      <div class="field">
+                        <label for="machine-wadn">Unit WADN</label>
+                        <input id="machine-wadn" placeholder="Unit serial" />
+                      </div>
+                    </div>
+
+                    <div class="two-col">
+                      <div class="field">
+                        <label for="machine-qty">Quantity</label>
+                        <input id="machine-qty" type="number" value="1" min="1" />
+                      </div>
+                      <div class="field">
+                        <label for="machine-price">Unit Price (₹)</label>
+                        <input id="machine-price" type="number" value="0" min="0" step="0.01" />
+                      </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                      <button id="add-machine-item" class="btn primary" type="button">Add to Cart</button>
+                      <button id="scan-machine-item" class="btn" type="button">Scan Aztec / QR</button>
+                    </div>
+                  </div>
+
+                  <!-- Right: Cart & Change settlement -->
+                  <div class="section">
+                    <div class="section-head"><h3>Transaction Cart</h3></div>
+                    <div id="machine-cart" class="list"></div>
+                    <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:14px; display:flex; justify-content:space-between; align-items:center;">
+                      <strong>Order Total:</strong>
+                      <strong id="machine-total" style="font-size:1.4rem;">₹0</strong>
+                    </div>
+
+                    <div class="two-col" style="margin-top:14px;">
+                      <div class="field">
+                        <label for="machine-cash">Cash Received (₹)</label>
+                        <input id="machine-cash" type="number" min="0" step="0.01" value="0" />
+                      </div>
+                      <div class="field">
+                        <label for="machine-shortage">Change Shortage Owed (₹)</label>
+                        <input id="machine-shortage" type="number" min="0" step="0.01" value="0" readonly />
+                      </div>
+                    </div>
+
+                    <div id="machine-credit-banner" class="schema-box hidden"></div>
+
+                    <button id="log-change-debt" class="btn warn" type="button" style="width:100%; margin-top:10px;">
+                      Log Change Shortage Debt
+                    </button>
+                    <button id="submit-machine-sale" class="btn success" type="button" style="width:100%; margin-top:14px; padding:12px; font-size:14px;">
+                      Finalize Sale & Issue Credits
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+
+          window.__machineCart = [];
+          window.__machineAppliedCredits = [];
+          window.__machineDebtRequested = false;
+          renderMachineCart();
+
+          // Scan QR/Aztec into POS
+          document.getElementById('scan-machine-item')?.addEventListener('click', async () => {
+            await startQrScanner((item) => {
+              document.getElementById('machine-batch').value = item.batchNumber || '';
+              document.getElementById('machine-category').value = normalizeCategory(item.category);
+              document.getElementById('machine-wadn').value = item.wadn || '';
+              document.getElementById('machine-price').value = item.price || 0;
+              showToast(`Scanned: ${item.wadn || item.batchNumber}`);
+            });
+          });
+
+          // Check for active change credit notes for this customer
+          const refreshCreditBanner = async () => {
+            const phone = document.getElementById('machine-phone').value.trim();
+            const banner = document.getElementById('machine-credit-banner');
+            state.data = await loadAllData();
+            const credits = state.data.creditNotes.filter(
+              (note) => note.retailerId === retailer.id && note.consumerPhone === phone && note.status === 'active'
+            );
+            if (!phone || !credits.length) {
+              banner.classList.add('hidden');
+              banner.innerHTML = '';
+              return;
+            }
+            const balance = credits.reduce((sum, note) => sum + Number(note.amount || 0), 0);
+            banner.classList.remove('hidden');
+            banner.innerHTML = `
+              <strong>Customer Change Credit: ₹${formatCurrency(balance)}</strong>
+              <button type="button" class="btn success" id="apply-credit" style="width:100%; margin-top:10px;">
+                Apply Credit to this Order
+              </button>
+            `;
+            banner.querySelector('#apply-credit').onclick = () => {
+              window.__machineAppliedCredits = credits;
+              showToast('Credit applied to this order.');
+              banner.innerHTML = `<strong>₹${formatCurrency(balance)} credit will be redeemed at checkout.</strong>`;
+            };
+          };
+
+          document.getElementById('machine-phone')?.addEventListener('input', refreshCreditBanner);
+
+          // Cash shortage math
+          document.getElementById('machine-cash')?.addEventListener('input', () => {
+            const total = (window.__machineCart || []).reduce((sum, item) => sum + Number(item.total || 0), 0);
+            const cash = Number(document.getElementById('machine-cash').value || 0);
+            document.getElementById('machine-shortage').value = Math.max(0, cash - total).toFixed(2);
+          });
+
+          document.getElementById('log-change-debt')?.addEventListener('click', () => {
+            const total = (window.__machineCart || []).reduce((sum, item) => sum + Number(item.total || 0), 0);
+            const cash = Number(document.getElementById('machine-cash').value || 0);
+            const shortage = Math.max(0, cash - total);
+            if (!document.getElementById('machine-phone').value.trim() || !shortage) {
+              showToast('Enter customer phone and cash above total to log shortage.');
+              return;
+            }
+            window.__machineDebtRequested = true;
+            showToast(`₹${formatCurrency(shortage)} change debt recorded.`);
+          });
+
+          // Add item to cart
+          document.getElementById('add-machine-item')?.addEventListener('click', () => {
+            const phone = document.getElementById('machine-phone').value.trim();
+            const batch = document.getElementById('machine-batch').value.trim();
+            const qty = Number(document.getElementById('machine-qty').value || 1);
+            const price = Number(document.getElementById('machine-price').value || 0);
+            const category = normalizeCategory(document.getElementById('machine-category').value);
+            const wadn = document.getElementById('machine-wadn').value.trim() || `WADN-${batch}-${Date.now()}`;
+
+            if (!phone || !batch || !qty || !price) {
+              showToast('Enter phone, batch, and price.');
+              return;
+            }
+
+            const invItem = state.data.inventory.find(
+              (item) => item.retailerId === retailer.id && (item.batchNumber === batch || item.wadn === wadn)
+            );
+
+            window.__machineCart.push({
+              batch,
+              batchNumber: batch,
+              wadn,
+              category,
+              warrantyMonths: Number(invItem?.warrantyMonths || 0),
+              expiry: invItem?.expiry || '',
+              qty,
+              price,
+              total: qty * price
+            });
+
+            document.getElementById('machine-batch').value = '';
+            document.getElementById('machine-wadn').value = '';
+            document.getElementById('machine-qty').value = 1;
+            document.getElementById('machine-price').value = 0;
+            renderMachineCart();
+          });
+
+          // Finalize Sale
+          document.getElementById('submit-machine-sale')?.addEventListener('click', async () => {
+            const phone = document.getElementById('machine-phone').value.trim();
+            if (!phone || !window.__machineCart.length) {
+              showToast('Cart is empty or consumer phone missing.');
+              return;
+            }
+
+            state.data = await loadAllData();
+            const consumer = state.data.consumers.find((item) => item.phone === phone);
+            if (!consumer) {
+              showToast('Consumer account not found for this phone number. Please register in Trackly first.');
+              return;
+            }
+
+            const total = window.__machineCart.reduce((sum, item) => sum + Number(item.total || 0), 0);
+            const cashReceived = Number(document.getElementById('machine-cash').value || 0);
+            const appliedCredit = window.__machineAppliedCredits.reduce((sum, note) => sum + Number(note.amount || 0), 0);
+            const netPayable = Math.max(0, total - appliedCredit);
+            const shortage = Math.max(0, cashReceived - netPayable);
+            const amountPaid = Math.min(netPayable, cashReceived);
+            const rewardPct = Number(retailer?.rewards?.percentage || 4);
+            const fixedCredit = Number(retailer?.rewards?.fixedCredit || 25);
+            const creditAmount = Math.max(0, total * (rewardPct / 100) + fixedCredit);
+
+            const transaction = {
+              id: uid(),
+              retailerId: retailer.id,
+              retailerName: retailer.storeName || retailer.name,
+              consumerPhone: phone,
+              machineId: machine.id,
+              totalAmount: total,
+              amountPaid,
+              cashReceived,
+              changeDebtOwed: shortage,
+              changeDebtRequested: window.__machineDebtRequested,
+              creditApplied: appliedCredit,
+              creditAmount,
+              items: window.__machineCart,
+              createdAt: new Date().toISOString()
+            };
+
+            await writeTable('transactions', transaction);
+
+            if (shortage > 0) {
+              await writeTable('credit_notes', {
+                id: uid(),
+                retailerId: retailer.id,
+                retailerName: retailer.storeName || retailer.name,
+                consumerPhone: phone,
+                amount: shortage,
+                status: 'active',
+                transactionId: transaction.id,
+                createdAt: transaction.createdAt
+              });
+            }
+
+            for (const note of window.__machineAppliedCredits) {
+              note.status = 'redeemed';
+              note.redeemedAt = transaction.createdAt;
+              note.redeemedTransactionId = transaction.id;
+              await writeTable('credit_notes', note);
+            }
+
+            for (const soldItem of window.__machineCart) {
+              const inv = state.data.inventory.find(
+                (item) => item.retailerId === retailer.id && (item.batchNumber === soldItem.batchNumber || item.wadn === soldItem.wadn)
+              );
+              if (inv) {
+                inv.quantity = Math.max(0, Number(inv.quantity || 0) - Number(soldItem.qty || 0));
+                await writeTable('inventory', inv);
+              }
+            }
+
+            // Create Tax Invoice Document with RAD Dossiers
+            await writeTable('documents', {
+              id: `DOC-${transaction.id}`,
+              documentType: 'tax-invoice',
+              documentId: `DOC-${transaction.id}`,
+              retailerId: retailer.id,
+              storeName: retailer.storeName || retailer.name,
+              customerPhone: phone,
+              itemList: window.__machineCart,
+              amountPaid,
+              changeDebtOwed: shortage,
+              radDossiers: window.__machineCart.map((item) => ({
+                wadn: item.wadn,
+                category: item.category,
+                batchNumber: item.batchNumber,
+                purchaseDate: transaction.createdAt,
+                warrantyExpires: warrantyExpiry(item, new Date(transaction.createdAt)),
+                verificationStatus: 'RAD-Verified'
+              })),
+              createdAt: transaction.createdAt
+            });
+
+            // Update Consumer rewards ledger
+            consumer.credits = Number(consumer.credits || 0) + Number(creditAmount || 0);
+            consumer.purchases = Array.isArray(consumer.purchases) ? consumer.purchases : [];
+            consumer.purchases.push({
+              id: uid(),
+              createdAt: transaction.createdAt,
+              retailerName: retailer.storeName || retailer.name,
+              totalAmount: total,
+              creditAmount,
+              items: window.__machineCart
+            });
+            await writeTable('consumers', consumer);
+
+            showToast(`Sale completed! ₹${formatCurrency(creditAmount)} reward credit issued to ${consumer.name}.`);
+            window.__machineCart = [];
+            renderMachineDashboard(machine);
+          });
+
+          document.querySelector('[data-action="logout"]')?.addEventListener('click', () => {
+            state.session = null;
+            saveAveroSession(null);
+            renderAuth();
+          });
+        }
+
+        function renderMachineCart() {
+          const cartNode = document.getElementById('machine-cart');
+          const total = (window.__machineCart || []).reduce((sum, item) => sum + Number(item.total || 0), 0);
+          const totalNode = document.getElementById('machine-total');
+          if (totalNode) totalNode.textContent = `₹${formatCurrency(total)}`;
+          if (!cartNode) return;
+
+          cartNode.innerHTML = (window.__machineCart || []).length ? (window.__machineCart || []).map((item) => `
+            <div class="row-item">
+              <div>
+                <div style="font-weight:800;">${escapeHtml(item.batch)}</div>
+                <div class="tiny">Qty ${item.qty} &middot; ₹${formatCurrency(item.price)} each &middot; WADN: ${escapeHtml(item.wadn)}</div>
+              </div>
+              <div class="pill green">₹${formatCurrency(item.total)}</div>
+            </div>
+          `).join('') : '<div class="tiny">Cart is empty.</div>';
+        }
+
+        // ==========================================
+        // INITIALIZATION
+        // ==========================================
+
+        async function init() {
+          try {
+            await window.batchTrackConfigReady;
+            state.session = getAveroSession();
+            if (state.session) {
+              state.data = await loadAllData();
+              if (state.session.role === 'retailer') {
+                const retailer = state.data.retailers.find((item) => item.id === state.session.userId);
+                if (retailer) {
+                  renderRetailerDashboard(retailer);
+                  return;
+                }
+              } else if (state.session.role === 'machine') {
+                const machine = state.data.machines.find((item) => item.id === state.session.userId);
+                if (machine) {
+                  renderMachineDashboard(machine);
+                  return;
+                }
+              }
+            }
+            renderAuth();
+          } catch (err) {
+            console.error('Avero initialization error:', err);
+            renderAuth();
+          }
+        }
+
+        init();
+      })();
+    </script>
+  </body>
+</html>

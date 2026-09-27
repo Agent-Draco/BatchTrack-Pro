@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trackly — Consumer Intelligence Layer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/common.css" />
+    <style>
+      :root {
+        --bg: #f0f7fb;
+        --panel: #ffffff;
+        --panel-alt: #e0f2fe;
+        --ink: #0f172a;
+        --muted: #475569;
+        --line: #cbd5e1;
+        --brand: #0284c7;
+        --brand-2: #0369a1;
+        --brand-accent: #38bdf8;
+        --success: #059669;
+        --warning: #d97706;
+        --danger: #e11d48;
+        --shadow: 0 18px 45px rgba(2, 132, 199, 0.08);
+      }
+      .brand-mark {
+        background: linear-gradient(135deg, #0284c7, #0369a1);
+        color: #ffffff;
+      }
+      .summary-card::after {
+        background: var(--brand);
+      }
+      .btn.primary {
+        background: var(--brand);
+        color: #ffffff;
+      }
+      .btn.primary:hover {
+        background: var(--brand-2);
+      }
+      .category-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px;
+        margin-top: 14px;
+      }
+      .category-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .category-badge {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 4px 9px;
+        border-radius: 6px;
+        background: #e0f2fe;
+        color: #0369a1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="toast" class="toast"></div>
+
+    <!-- External libraries needed for scanning and Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/common.js"></script>
+    <script src="database/local-db.js"></script>
+
+    <script>
+      (function () {
+        'use strict';
+
+        const {
+          escapeHtml,
+          formatCurrency,
+          showToast,
+          uid,
+          normalizeCategory,
+          modeControl,
+          loadAllData,
+          writeTable,
+          startQrScanner
+        } = window.BatchTrackCommon;
+
+        const state = {
+          session: null,
+          consumer: null,
+          data: null,
+          authMode: 'signin'
+        };
+
+        const appNode = document.getElementById('app');
+
+        function getConsumerSession() {
+          try {
+            const raw = localStorage.getItem('trackly_session') || localStorage.getItem('batchtrack_session');
+            const s = JSON.parse(raw || 'null');
+            if (s && s.role === 'consumer') return s;
+            return null;
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function saveConsumerSession(session) {
+          if (session) {
+            localStorage.setItem('trackly_session', JSON.stringify(session));
+            localStorage.setItem('batchtrack_session', JSON.stringify(session));
+          } else {
+            localStorage.removeItem('trackly_session');
+            const s = JSON.parse(localStorage.getItem('batchtrack_session') || 'null');
+            if (s && s.role === 'consumer') {
+              localStorage.removeItem('batchtrack_session');
+            }
+          }
+        }
+
+        function renderAuth() {
+          const authForm = state.authMode === 'signin' ? `
+            <div class="card auth-card" style="background:#ffffff; border-color:var(--line);">
+              <h2>Consumer Sign In</h2>
+              <p class="tiny">Access your Trackly personal inventory and credit ledger.</p>
+              <form id="trackly-signin-form">
+                <div class="field">
+                  <label for="consumer-identifier">Phone number or Email</label>
+                  <input id="consumer-identifier" placeholder="+91 98... or name@example.com" required />
+                </div>
+                <div class="field">
+                  <label for="consumer-password">Password</label>
+                  <input id="consumer-password" type="password" placeholder="••••••••" required />
+                </div>
+                <button class="btn primary" type="submit" style="width:100%; margin-top:8px;">Sign in to Trackly</button>
+              </form>
+            </div>
+          ` : `
+            <div class="card auth-card" style="background:#ffffff; border-color:var(--line);">
+              <h2>Create Trackly Account</h2>
+              <p class="tiny">Join Trackly to track purchases, freshness, and change rewards.</p>
+              <form id="trackly-signup-form">
+                <div class="field">
+                  <label for="consumer-name">Full name</label>
+                  <input id="consumer-name" placeholder="Priya Sharma" required />
+                </div>
+                <div class="field">
+                  <label for="consumer-phone">Phone number</label>
+                  <input id="consumer-phone" placeholder="+91 98765 43210" required />
+                </div>
+                <div class="field">
+                  <label for="consumer-email">Email (optional)</label>
+                  <input id="consumer-email" type="email" placeholder="priya@example.com" />
+                </div>
+                <div class="field">
+                  <label for="consumer-password-new">Password</label>
+                  <input id="consumer-password-new" type="password" placeholder="Create password" minlength="4" required />
+                </div>
+                <button class="btn primary" type="submit" style="width:100%; margin-top:8px;">Create Account</button>
+              </form>
+            </div>
+          `;
+
+          appNode.innerHTML = `
+            <div class="app-shell">
+              <nav class="nav">
+                <div class="brand">
+                  <span class="brand-mark">T</span>
+                  <div>
+                    <div>Trackly</div>
+                    <span class="brand-sub">by BatchTrack</span>
+                  </div>
+                </div>
+                <div class="nav-links">
+                  ${modeControl()}
+                  <a class="nav-action parent-link" href="index.html">&larr; BatchTrack</a>
+                </div>
+              </nav>
+
+              <div class="auth-shell">
+                <div class="auth-intro">
+                  <div class="eyebrow" style="background:#e0f2fe; border-color:#bae6fd; color:#0369a1;">Consumer Intelligence</div>
+                  <h1>Trackly Personal Inventory</h1>
+                  <p>Keep track of your grocery freshness, medicine batch safety, and electronics warranties across retailers.</p>
+                </div>
+
+                <div class="mode-switch" aria-label="Auth mode">
+                  <button class="${state.authMode === 'signin' ? 'active' : ''}" type="button" data-switch-auth="signin">Sign In</button>
+                  <button class="${state.authMode === 'signup' ? 'active' : ''}" type="button" data-switch-auth="signup">Create Account</button>
+                </div>
+
+                ${authForm}
+              </div>
+            </div>
+          `;
+
+          bindAuthEvents();
+        }
+
+        function bindAuthEvents() {
+          document.querySelectorAll('[data-switch-auth]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              state.authMode = btn.dataset.switchAuth;
+              renderAuth();
+            });
+          });
+
+          document.getElementById('trackly-signin-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const identifier = document.getElementById('consumer-identifier').value.trim();
+            const password = document.getElementById('consumer-password').value;
+
+            if (!identifier || !password) {
+              showToast('Please enter both your phone/email and password.');
+              return;
+            }
+
+            try {
+              state.data = await loadAllData();
+              const consumer = state.data.consumers.find(
+                (item) => (item.phone === identifier || item.email === identifier) && item.password === password
+              );
+
+              if (!consumer) {
+                showToast('Consumer account not found or invalid password.');
+                return;
+              }
+
+              state.session = { role: 'consumer', userId: consumer.id };
+              state.consumer = consumer;
+              saveConsumerSession(state.session);
+              renderDashboard();
+            } catch (err) {
+              console.error(err);
+              showToast('Sign in failed. Could not reach database.');
+            }
+          });
+
+          document.getElementById('trackly-signup-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('consumer-name').value.trim();
+            const phone = document.getElementById('consumer-phone').value.trim();
+            const email = document.getElementById('consumer-email').value.trim();
+            const password = document.getElementById('consumer-password-new').value;
+
+            if (!name || !phone || !password) {
+              showToast('Name, phone, and password are required.');
+              return;
+            }
+
+            try {
+              state.data = await loadAllData();
+              const existing = state.data.consumers.find((c) => c.phone === phone);
+              if (existing) {
+                showToast('An account with this phone number already exists.');
+                return;
+              }
+
+              const consumer = {
+                id: uid(),
+                name,
+                phone,
+                email: email || `${phone.replace(/\D/g, '')}@consumer.local`,
+                password,
+                city: 'Local',
+                credits: 0,
+                purchases: [],
+                tracklyItems: [],
+                createdAt: new Date().toISOString()
+              };
+
+              await writeTable('consumers', consumer);
+              state.session = { role: 'consumer', userId: consumer.id };
+              state.consumer = consumer;
+              saveConsumerSession(state.session);
+              showToast('Account created! Welcome to Trackly.');
+              renderDashboard();
+            } catch (err) {
+              console.error(err);
+              showToast('Account creation failed.');
+            }
+          });
+        }
+
+        async function renderDashboard() {
+          state.data = await loadAllData();
+          const consumer = state.data.consumers.find((item) => item.id === state.session.userId);
+
+          if (!consumer) {
+            state.session = null;
+            saveConsumerSession(null);
+            renderAuth();
+            return;
+          }
+          state.consumer = consumer;
+
+          const consumerTransactions = state.data.transactions.filter((tx) => tx.consumerPhone === consumer.phone);
+          const ownedItems = Array.isArray(consumer.tracklyItems) && consumer.tracklyItems.length
+            ? consumer.tracklyItems
+            : consumerTransactions.flatMap((tx) =>
+                (tx.items || []).map((item) => ({
+                  ...item,
+                  retailerId: tx.retailerId,
+                  retailerName: tx.retailerName,
+                  purchaseDate: tx.createdAt
+                }))
+              );
+
+          const totalCredit = consumer.credits || 0;
+
+          const categoryView = (category) => {
+            const list = ownedItems.filter((item) => normalizeCategory(item.category) === category);
+            if (!list.length) {
+              return '<div class="tiny" style="color:var(--muted); padding:8px 0;">No items tracked in this category yet.</div>';
+            }
+
+            return list.map((item) => {
+              const daysToExpiry = item.expiry ? Math.ceil((new Date(item.expiry) - new Date()) / 86400000) : null;
+              const warranty = Number(item.warrantyMonths || 0);
+              const ticketButton = category === 'electronics' || category === 'pharma'
+                ? `<button class="btn" type="button" data-service-wadn="${escapeHtml(item.wadn || '')}">Request Service</button>`
+                : '';
+
+              let detail = '';
+              if (category === 'pharma') {
+                const badge = daysToExpiry === null
+                  ? ''
+                  : `<span class="pill ${daysToExpiry <= 0 ? 'red' : 'blue'}">${daysToExpiry <= 0 ? 'Expired' : `${daysToExpiry} days left`}</span>`;
+                detail = `Batch safety verification: <span class="pill green">DCGI status pending review</span> ${badge}`;
+              } else if (category === 'consumables') {
+                const prompt = daysToExpiry !== null && daysToExpiry <= 15
+                  ? '<span class="pill red">15-day prompt</span>'
+                  : '<span class="pill green">Monitored</span>';
+                detail = `Freshness window: ${escapeHtml(item.expiry || 'Not recorded')} ${prompt}`;
+              } else {
+                detail = `Warranty: ${warranty} months remaining <span class="pill green">WADN verified</span>`;
+              }
+
+              return `
+                <div class="row-item" style="background:#ffffff; margin-top:8px;">
+                  <div>
+                    <strong>${escapeHtml(item.wadn || item.batchNumber || 'Tracked item')}</strong>
+                    <div class="tiny">Batch ${escapeHtml(item.batchNumber || '—')} &middot; ${detail}</div>
+                  </div>
+                  ${ticketButton}
+                </div>
+              `;
+            }).join('');
+          };
+
+          appNode.innerHTML = `
+            <div class="app-shell">
+              <nav class="nav">
+                <div class="brand">
+                  <span class="brand-mark">T</span>
+                  <div>
+                    <div>Trackly</div>
+                    <span class="brand-sub">by BatchTrack</span>
+                  </div>
+                </div>
+                <div class="nav-links">
+                  ${modeControl()}
+                  <button type="button" class="nav-action primary" data-action="consumer-scan">Scan Aztec</button>
+                  <a class="nav-action parent-link" href="index.html" title="BatchTrack Parent Ecosystem">&larr; BatchTrack</a>
+                  <button type="button" data-action="logout">Logout</button>
+                </div>
+              </nav>
+
+              <div class="dashboard">
+                <!-- Summary Metrics -->
+                <div class="summary">
+                  <div class="summary-card">
+                    <span class="k">Available Credit</span>
+                    <strong>₹${formatCurrency(totalCredit)}</strong>
+                    <small>rewards & change notes</small>
+                  </div>
+                  <div class="summary-card">
+                    <span class="k">Tracked Purchases</span>
+                    <strong>${consumerTransactions.length}</strong>
+                    <small>verified transactions</small>
+                  </div>
+                  <div class="summary-card">
+                    <span class="k">Personal Wallet</span>
+                    <strong style="font-size:1.25rem; margin-top:14px;">${escapeHtml(consumer.phone)}</strong>
+                    <small>${escapeHtml(consumer.name)}</small>
+                  </div>
+                  <div class="summary-card">
+                    <span class="k">Registered Area</span>
+                    <strong style="font-size:1.4rem; margin-top:12px;">${escapeHtml(consumer.city || 'Local')}</strong>
+                    <small>store network</small>
+                  </div>
+                </div>
+
+                <div class="workspace">
+                  <!-- Main Column: Trackly Ownership & Categories -->
+                  <div class="section">
+                    <div class="section-head">
+                      <div>
+                        <h3>Trackly Ownership Ledger</h3>
+                        <div class="tiny">Live batch intelligence across all purchased items</div>
+                      </div>
+                      <button type="button" class="btn primary" data-action="consumer-scan">
+                        <span>&#x1F4F8;</span> Scan Aztec
+                      </button>
+                    </div>
+
+                    <!-- Consumables -->
+                    <div class="category-card">
+                      <div class="category-header">
+                        <strong>Consumables</strong>
+                        <span class="category-badge">Freshness & Expiry</span>
+                      </div>
+                      <div class="list">${categoryView('consumables')}</div>
+                    </div>
+
+                    <!-- Pharma -->
+                    <div class="category-card">
+                      <div class="category-header">
+                        <strong>Pharma & Healthcare</strong>
+                        <span class="category-badge">DCGI Safety & Batch Recall</span>
+                      </div>
+                      <div class="list">${categoryView('pharma')}</div>
+                    </div>
+
+                    <!-- Electronics -->
+                    <div class="category-card">
+                      <div class="category-header">
+                        <strong>Electronics & Durables</strong>
+                        <span class="category-badge">Warranty & Support</span>
+                      </div>
+                      <div class="list">${categoryView('electronics')}</div>
+                    </div>
+
+                    <!-- Purchase History Ledger -->
+                    <div class="section-head" style="margin-top:28px;">
+                      <h3>Purchase Ledger</h3>
+                    </div>
+                    <div class="table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Retailer</th>
+                            <th>Amount</th>
+                            <th>Credit Earned</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${consumerTransactions.length ? consumerTransactions.map((tx) => `
+                            <tr>
+                              <td>${new Date(tx.createdAt).toLocaleDateString()}</td>
+                              <td>${escapeHtml(tx.retailerName || 'Store')}</td>
+                              <td>₹${formatCurrency(tx.totalAmount || 0)}</td>
+                              <td><span class="pill green">+₹${formatCurrency(tx.creditAmount || 0)}</span></td>
+                            </tr>
+                          `).join('') : '<tr><td colspan="4">No purchases recorded yet.</td></tr>'}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- Sidebar: Profile & Quick Aztec Scan -->
+                  <div class="section">
+                    <div class="section-head">
+                      <h3>Trackly Account</h3>
+                    </div>
+                    <div class="list">
+                      <div class="row-item" style="background:#ffffff;">
+                        <div class="row-meta">
+                          <div class="avatar" style="background:linear-gradient(135deg,#0284c7,#38bdf8); color:#fff;">
+                            ${escapeHtml((consumer.name || 'C').slice(0, 2).toUpperCase())}
+                          </div>
+                          <div>
+                            <div style="font-weight:800;">${escapeHtml(consumer.name)}</div>
+                            <div class="tiny">${escapeHtml(consumer.email)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="field" style="margin-top:16px;">
+                      <label>Registered Phone</label>
+                      <input value="${escapeHtml(consumer.phone)}" readonly />
+                    </div>
+
+                    <div style="margin-top:18px;">
+                      <button type="button" class="btn primary" data-action="consumer-scan" style="width:100%; padding:12px;">
+                        Scan Aztec Barcode
+                      </button>
+                    </div>
+
+                    <div class="schema-box" style="margin-top:20px;">
+                      <strong>Aztec Scanning in Trackly</strong>
+                      <p class="tiny" style="margin:4px 0 0; line-height:1.5;">
+                        Point your camera at any Aztec code on your product or receipt. 
+                        Trackly immediately synchronizes the verified tax invoice, manufacturer batch, and official RAD warranty dossier.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+
+          bindDashboardEvents(consumer, ownedItems);
+        }
+
+        function bindDashboardEvents(consumer, ownedItems) {
+          document.querySelectorAll('[data-action="consumer-scan"]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              await startQrScanner(async (item) => {
+                state.data = await loadAllData();
+                const documentMatch = state.data.documents.find(
+                  (doc) => doc.customerPhone === consumer.phone &&
+                    (doc.radDossiers || []).some((rad) => rad.wadn === item.wadn)
+                );
+
+                const existing = (consumer.tracklyItems || []).find((owned) => owned.wadn === item.wadn);
+                const tracked = {
+                  ...item,
+                  category: normalizeCategory(item.category),
+                  retailerId: documentMatch?.retailerId || null,
+                  retailerName: documentMatch?.storeName || 'Self-tracked',
+                  verified: Boolean(documentMatch),
+                  purchaseDate: documentMatch?.createdAt || new Date().toISOString()
+                };
+
+                consumer.tracklyItems = Array.isArray(consumer.tracklyItems) ? consumer.tracklyItems : [];
+                if (!existing) {
+                  consumer.tracklyItems.push(tracked);
+                }
+
+                await writeTable('consumers', consumer);
+                showToast(documentMatch ? 'Verified tax bill and RAD history linked!' : 'Offline item added to Trackly.');
+                renderDashboard();
+              });
+            });
+          });
+
+          document.querySelectorAll('[data-service-wadn]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              const wadn = btn.dataset.serviceWadn;
+              const description = window.prompt('Briefly describe the service or repair issue:');
+              if (!description) return;
+
+              const item = ownedItems.find((entry) => entry.wadn === wadn);
+              await writeTable('support_tickets', {
+                id: uid(),
+                wadn: item?.wadn || wadn,
+                consumerPhone: consumer.phone,
+                retailerId: item?.retailerId || null,
+                category: normalizeCategory(item?.category),
+                description,
+                status: 'open',
+                createdAt: new Date().toISOString()
+              });
+              showToast('Service request submitted to the retailer.');
+              renderDashboard();
+            });
+          });
+
+          document.querySelectorAll('[data-action="logout"]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              state.session = null;
+              saveConsumerSession(null);
+              renderAuth();
+            });
+          });
+        }
+
+        async function init() {
+          try {
+            await window.batchTrackConfigReady;
+            state.session = getConsumerSession();
+            if (state.session) {
+              await renderDashboard();
+            } else {
+              renderAuth();
+            }
+          } catch (err) {
+            console.error('Trackly initialization error:', err);
+            renderAuth();
+          }
+        }
+
+        init();
+      })();
+    </script>
+  </body>
+</html>
