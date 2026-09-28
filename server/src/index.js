@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const store = require('./services/store');
+const averoStore = require('./services/avero/averoStore');
 const apiRouter = require('./routes/apiRouter');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -16,9 +17,12 @@ app.use(errorHandler);
 
 async function boot() {
   await store.seed();
-  app.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-  });
+  await averoStore.seed();
+  if (process.env.NODE_ENV !== 'test') {
+    app.listen(PORT, () => {
+      console.log(`[BatchTrack] Server running on port ${PORT} with segregated Trackly & Avero subsystems`);
+    });
+  }
 }
 
 boot();

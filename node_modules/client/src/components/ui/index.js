@@ -17,3 +17,4 @@ export { default as Skeleton } from './Skeleton.jsx';
 export { default as Modal } from './Modal.jsx';
 export { default as WadnDisplay } from './WadnDisplay.jsx';
 export { default as LifecycleTimeline } from './LifecycleTimeline.jsx';
+export { default as BrandLogo } from './BrandLogo.jsx';

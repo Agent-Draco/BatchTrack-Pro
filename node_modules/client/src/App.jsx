@@ -1,6 +1,7 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { AppShell } from './layouts/index.js';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/index.js';
+import { LandingLayout, TracklyLayout, AveroLayout, PlatformLayout } from './layouts/index.js';
 import { ToastHost } from './components/ui/index.js';
 import {
   LandingPage,
@@ -9,11 +10,13 @@ import {
   ExpiryIntelligencePage,
   RecipesPage,
   ProductDetailPage,
+  TracklyAuthPage,
   AveroDashboardPage,
   InventoryPage,
   SalvagePage,
   PosPage,
   ServiceQueuePage,
+  AveroAuthPage,
   IdentityPage,
   MarketplacePage,
   AnalyticsPage,
@@ -23,28 +26,47 @@ import {
 
 export default function App() {
   return (
-    <>
+    <AuthProvider>
       <Routes>
-        <Route element={<AppShell />}>
+        {/* Landing Page Route */}
+        <Route element={<LandingLayout />}>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/trackly/dashboard" element={<TracklyDashboardPage />} />
-          <Route path="/trackly/pantry" element={<PantryScanPage />} />
-          <Route path="/trackly/expiry" element={<ExpiryIntelligencePage />} />
-          <Route path="/trackly/recipes" element={<RecipesPage />} />
-          <Route path="/trackly/product/:wadn" element={<ProductDetailPage />} />
-          <Route path="/avero/dashboard" element={<AveroDashboardPage />} />
-          <Route path="/avero/inventory" element={<InventoryPage />} />
-          <Route path="/avero/salvage" element={<SalvagePage />} />
-          <Route path="/avero/pos" element={<PosPage />} />
-          <Route path="/avero/service-queue" element={<ServiceQueuePage />} />
+        </Route>
+
+        {/* Dedicated Trackly Consumer App */}
+        <Route path="/trackly" element={<TracklyLayout />}>
+          <Route index element={<Navigate to="/trackly/dashboard" replace />} />
+          <Route path="dashboard" element={<TracklyDashboardPage />} />
+          <Route path="pantry" element={<PantryScanPage />} />
+          <Route path="expiry" element={<ExpiryIntelligencePage />} />
+          <Route path="recipes" element={<RecipesPage />} />
+          <Route path="product/:wadn" element={<ProductDetailPage />} />
+          <Route path="auth" element={<TracklyAuthPage />} />
+        </Route>
+
+        {/* Dedicated Avero Retailer OS */}
+        <Route path="/avero" element={<AveroLayout />}>
+          <Route index element={<Navigate to="/avero/dashboard" replace />} />
+          <Route path="dashboard" element={<AveroDashboardPage />} />
+          <Route path="inventory" element={<InventoryPage />} />
+          <Route path="salvage" element={<SalvagePage />} />
+          <Route path="pos" element={<PosPage />} />
+          <Route path="service-queue" element={<ServiceQueuePage />} />
+          <Route path="auth" element={<AveroAuthPage />} />
+        </Route>
+
+        {/* Shared Platform Infrastructure */}
+        <Route element={<PlatformLayout />}>
           <Route path="/identity" element={<IdentityPage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/demo" element={<DemoPage />} />
         </Route>
+
+        {/* 404 Catch-All */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <ToastHost />
-    </>
+    </AuthProvider>
   );
 }

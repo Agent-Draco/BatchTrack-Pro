@@ -1,33 +1,38 @@
 const express = require('express');
-const store = require('../services/store');
 const { ok } = require('../utils/response');
 
-const productsRouter = require('./products');
-const inventoryRouter = require('./inventory');
-const usersRouter = require('./users');
-const transactionsRouter = require('./transactions');
-const serviceTicketsRouter = require('./serviceTickets');
-const changeCreditsRouter = require('./changeCredits');
-const analyticsRouter = require('./analytics');
-const pantryRouter = require('./pantry');
-const wadnRouter = require('./wadn');
-const marketplaceRouter = require('./marketplace');
+// Trackly Routes
+const pantryRouter = require('./trackly/pantry');
+const marketplaceRouter = require('./trackly/marketplace');
+
+// Common Platform Routes
+const usersRouter = require('./common/users');
+const wadnRouter = require('./common/wadn');
+
+// Avero Dedicated OS & POS Routes
+const averoRouter = require('./avero/averoRouter');
 
 const apiRouter = express.Router();
 
 apiRouter.get('/health', (req, res) => {
-  ok(res, { ok: true, ts: Date.now() });
+  ok(res, { ok: true, name: 'BatchTrack API (Trackly + Avero)', ts: Date.now() });
 });
 
-apiRouter.use('/products', productsRouter);
-apiRouter.use('/inventory', inventoryRouter);
-apiRouter.use('/users', usersRouter);
-apiRouter.use('/transactions', transactionsRouter);
-apiRouter.use('/service-tickets', serviceTicketsRouter);
-apiRouter.use('/change-credits', changeCreditsRouter);
-apiRouter.use('/analytics', analyticsRouter);
+// Avero Enterprise & POS Subsystem
+apiRouter.use('/avero', averoRouter);
+
+// Trackly Consumer Subsystem
 apiRouter.use('/pantry', pantryRouter);
-apiRouter.use('/wadn', wadnRouter);
 apiRouter.use('/marketplace', marketplaceRouter);
+
+// Common Identity & Shared Registry Subsystem
+apiRouter.use('/users', usersRouter);
+apiRouter.use('/wadn', wadnRouter);
+
+// Direct compatibility aliases mapped cleanly to Avero engine
+apiRouter.get('/products', (req, res, next) => averoRouter.handle(req, res, next));
+apiRouter.get('/inventory', (req, res, next) => averoRouter.handle(req, res, next));
+apiRouter.get('/transactions', (req, res, next) => averoRouter.handle(req, res, next));
+apiRouter.post('/transactions', (req, res, next) => averoRouter.handle(req, res, next));
 
 module.exports = apiRouter;
