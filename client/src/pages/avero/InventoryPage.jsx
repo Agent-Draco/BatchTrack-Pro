@@ -5,7 +5,7 @@ import { DataTable, useToast, Skeleton, EmptyState } from '../../components/ui/i
 export default function InventoryPage() {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { addToast } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     loadInventory();
@@ -16,7 +16,7 @@ export default function InventoryPage() {
       const data = await getAveroInventory();
       setInventory(data);
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     } finally {
       setLoading(false);
     }

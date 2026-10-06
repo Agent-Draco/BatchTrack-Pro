@@ -5,7 +5,7 @@ import { DataTable, Button, useToast, Skeleton, EmptyState, Tag } from '../../co
 export default function SalvagePage() {
   const [salvage, setSalvage] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { addToast } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     loadSalvage();
@@ -16,7 +16,7 @@ export default function SalvagePage() {
       const data = await getAveroSalvage();
       setSalvage(data);
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     } finally {
       setLoading(false);
     }

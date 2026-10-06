@@ -5,7 +5,7 @@ import { StatCard, Card, CardHeader, CardContent, Skeleton, EmptyState, useToast
 export default function AveroDashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { addToast } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     loadDashboard();
@@ -16,7 +16,7 @@ export default function AveroDashboardPage() {
       const res = await getAveroDashboard();
       setData(res);
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     } finally {
       setLoading(false);
     }

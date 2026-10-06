@@ -6,7 +6,7 @@ import { Button, useToast, Tag } from '../../components/ui/index.js';
 export default function PosReturnPage() {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [items, setItems] = useState([]); // Dummy data structure for return items
-  const { addToast } = useToast();
+  const toast = useToast();
   const navigate = useNavigate();
 
   const handleLookup = (e) => {
@@ -23,10 +23,10 @@ export default function PosReturnPage() {
   const handleReturn = async () => {
     try {
       await posInitiateReturn({ invoiceNumber, items });
-      addToast('Return processed successfully', 'success');
+      toast.push('Return processed successfully', 'success');
       navigate('/pos');
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     }
   };
 

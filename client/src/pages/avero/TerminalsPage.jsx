@@ -5,7 +5,7 @@ import { DataTable, Button, useToast, Skeleton, EmptyState, Tag } from '../../co
 export default function TerminalsPage() {
   const [terminals, setTerminals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { addToast } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     loadTerminals();
@@ -16,7 +16,7 @@ export default function TerminalsPage() {
       const data = await getAveroTerminals();
       setTerminals(data);
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     } finally {
       setLoading(false);
     }

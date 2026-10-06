@@ -5,7 +5,7 @@ import { DataTable, Button, useToast, Skeleton, EmptyState } from '../../compone
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { addToast } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     loadCustomers();
@@ -16,7 +16,7 @@ export default function CustomersPage() {
       const data = await getAveroCustomers();
       setCustomers(data);
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     } finally {
       setLoading(false);
     }

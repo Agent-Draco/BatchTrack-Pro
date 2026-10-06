@@ -1,11 +1,22 @@
 import { supabase } from '../../services/supabase.js';
 
 async function getAuthHeaders() {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ? { 
-    'Authorization': `Bearer ${session.access_token}`,
+  let token = 'demo-retailer-token';
+  if (supabase) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        token = session.access_token;
+      }
+    } catch {
+      // noop
+    }
+  }
+
+  return { 
+    'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json'
-  } : { 'Content-Type': 'application/json' };
+  };
 }
 
 async function apiRequest(endpoint, options = {}) {

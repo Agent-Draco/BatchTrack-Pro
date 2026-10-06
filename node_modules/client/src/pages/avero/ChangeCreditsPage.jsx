@@ -5,7 +5,7 @@ import { DataTable, useToast, Skeleton, EmptyState, Tag } from '../../components
 export default function ChangeCreditsPage() {
   const [credits, setCredits] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { addToast } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     loadCredits();
@@ -16,7 +16,7 @@ export default function ChangeCreditsPage() {
       const data = await getAveroChangeCredits();
       setCredits(data);
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     } finally {
       setLoading(false);
     }

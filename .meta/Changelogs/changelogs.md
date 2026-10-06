@@ -2,38 +2,38 @@
 
 All notable changes to the BatchTrack Pro ecosystem are documented in this file.
 
-## [Unreleased] - 2026-09-28
+## [Unreleased] - 2026-10-06
 
 ### Added
-- **Full Avero Enterprise & Scan-First POS Redesign & Rebuild**:
-  - Rebuilt Avero logic from scratch around the core principle: *"Avero records and orchestrates retail operations; it does not need to be the payment processor."*
-  - **3-Level Inventory Hierarchy**: Segregated Products & SKUs $\rightarrow$ Batches (with expiry windows, cost basis, MRP) $\rightarrow$ Serialized WADNs & unit instances with an append-only stock movement ledger (`InventoryPage.jsx`).
-  - **Scan-First Aztec POS Terminal (`PosPage.jsx`)**: Built ultra-fast countertop POS optimized for physical barcode scanners (sub-45ms autofocus), multi-tender split payments (Cash, UPI, Card, Change Credit), change credit digital wallet ledger toggle, manager PIN overrides (`1234` / `9999`), and printable thermal receipts.
-  - **Dual Access & Authentication Model**:
-    - **Avero Enterprise Portal (`/avero/*`)**: Gatekept by merchant account authentication context.
-    - **Avero POS Portal (`/avero/pos` & `/pos`)**: Operates independently with 4-digit station PIN authorization without requiring enterprise login.
-  - **Immutable Sales Ledger (`SalesPage.jsx`)**: Full transaction audit history, itemized receipt breakdown modals, split payment audit logs, and direct return intake triggers.
-  - **Customer Returns & Service Queue Desk (`ServiceQueuePage.jsx`)**: Customer intake workflow with 6-way disposition routing (`RESTOCK` to batch, `SALVAGE` to vendor claim, `DAMAGED` write-off, `QUARANTINE` QA, `REPAIR`, `DISPOSAL`), with manager authorization.
-  - **Store Change Credit Digital Wallet Ledger (`ChangeCreditsPage.jsx`)**: Phone-linked customer wallet float engine with full transaction history ledger (`POS_CHANGE_CREDIT`, `POS_CHECKOUT_REDEEM`, `RETURN_REFUND_CREDIT`) eliminating coin shortage friction.
-  - **Terminal Management & Surveillance (`TerminalsPage.jsx`)**: Counter station provisioning, PIN configuration, live heartbeat surveillance, and cashier assignment.
-  - **Cryptographic Audit Stream (`AuditPage.jsx`)**: Tamper-evident immutable event stream with SHA-256 signatures, action filters, and JSON metadata payload inspection.
-  - **Operational Gateway (`AveroPortalPage.jsx`)**: Quick portal switcher between Enterprise OS, Aztec POS Counter, and Trackly consumer pantry.
-  - **API Client & Backend Subsystem**:
-    - `client/src/services/avero/averoApi.js`: Complete typed API client library for all Avero operations.
-    - `server/src/services/avero/averoStore.js`: Centralized business engine maintaining 3-level inventory, split checkout, change credit ledger, return triage, and audit streams.
-    - `server/src/routes/avero/averoRouter.js` & `server/src/controllers/avero/averoController.js`: RESTful endpoints mounted under `/api/avero`.
-- **Segregated Source Trees**:
-  - `client/src/pages/trackly/`: Dedicated consumer pantry suite (`TracklyDashboardPage`, `PantryScanPage`, `ExpiryIntelligencePage`, `RecipesPage`, `ProductDetailPage`, `ShoppingListPage`, `TracklyAuthPage`, `TracklyPortalPage`).
-  - `client/src/pages/avero/`: Dedicated merchant enterprise suite (`AveroDashboardPage`, `InventoryPage`, `SalvagePage`, `PosPage`, `SalesPage`, `ServiceQueuePage`, `ChangeCreditsPage`, `TerminalsPage`, `AuditPage`, `AveroAuthPage`, `AveroPortalPage`).
-  - `client/src/pages/platform/`: Platform shared pages (`LandingPage`, `IdentityPage`, `MarketplacePage`, `AnalyticsPage`, `DemoPage`, `NotFoundPage`).
-
-### Changed
-- Updated `client/src/layouts/AveroLayout.jsx` with full sub-navigation tabs across all Avero enterprise modules.
-- Updated `client/src/App.jsx` and `client/src/pages/index.js` with comprehensive routing and export mappings.
+- **Database Schema Templates (`/database/`)**:
+  - Generated all 21 RFC-4180 CSV schema files representing the complete database architecture (`organizations`, `profiles`, `customers`, `products`, `batches`, `wadns`, `wadn_history`, `inventory_movements`, `sales`, `sale_items`, `payments`, `change_credits`, `returns`, `return_items`, `refunds`, `terminals`, `pos_sessions`, `audit_logs`, `invoice_sequences`, `payment_providers`, `salvage_tickets`).
+  - Added comprehensive `README.md` with entity relationship documentation and sample data definitions.
+- **Resilient Data Service Engine (`server/src/services/db.js`)**:
+  - Implemented automatic in-memory data store seeded directly from `/database/*.csv` files, providing high availability and zero-downtime fallback when PostgreSQL tables or network connections are initializing.
+- **Dedicated Standalone Aztec POS Portal**:
+  - Standalone POS layout and flow at `/pos` (`PosTerminalPage.jsx`, `PosLoginPage.jsx`, `PosReturnPage.jsx`) isolated from enterprise navigation.
+  - Dedicated POS API client (`client/src/services/pos/posApi.js`) and token authorization middleware (`server/src/middleware/authPos.js`).
 
 ### Fixed
-- Resolved all syntax/export issues across `client/src/pages/avero/` modules (`PosPage.jsx`, `SalesPage.jsx`, `ServiceQueuePage.jsx`, `ChangeCreditsPage.jsx`, `TerminalsPage.jsx`, `AuditPage.jsx`, `AveroPortalPage.jsx`).
-- Verified zero-error client production compilation (`npm run build`).
+- **Fixed "Launch Avero Retailer OS" Not Working**:
+  - Restored `switchRole`, `isRetailer`, `isConsumer`, `loginAsDemo`, `DEMO_RETAILER`, and `DEMO_CONSUMER` in `AuthContext.jsx` and exported them in `context/index.js`, eliminating `TypeError: switchRole is not a function`.
+  - Updated `EnterpriseAuthGuard.jsx` to recognize active retailer sessions and allow seamless entry into the Avero Retailer OS.
+  - Enhanced `AveroAuthPage.jsx` with an instant "Sign in as Aztec Supermarket Manager" one-click entrance alongside standard Supabase authentication.
+- **UI Component & Table Compatibility**:
+  - Enhanced `DataTable.jsx` to transparently accept both `data` and `rows` arrays, as well as `accessor`/`header` and `key`/`label` column definitions.
+  - Normalized `useToast` calls across all Avero and POS pages to use `toast.push(msg, type)` instead of deprecated `addToast`.
+- **API & Data Mapping Alignment**:
+  - Enriched `dashboardController.js` to return live aggregated KPIs, formatted currency strings, attention alerts, and audit logs.
+  - Mapped fields across `productsController.js` (stock, price), `inventoryController.js` (item array), `salesController.js` (total_amount), `returnsController.js` (refund_amount), `customersController.js` (credit_balance), and `terminalsController.js` (name, location, cashier).
+- **Environment & Server Configuration**:
+  - Synchronized credentials in `server/.env` with root `.env`.
+  - Added `--use-system-ca` compatibility for secure Supabase TLS connections on Windows.
+
+### Changed
+- Refined `AveroLayout.jsx`:
+  - Completely removed all Trackly buttons and references from the Avero management interface.
+  - Added official Avero brand logo, Aztec Supermarket store badge, and live terminal indicator.
+  - Added Profile navigation linking to `/avero/profile` which includes a dedicated "Return to BatchTrack Home" action.
 
 ## [0.1.0] - 2026-09-27
 

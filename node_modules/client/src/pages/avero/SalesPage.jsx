@@ -5,7 +5,7 @@ import { DataTable, useToast, Skeleton, EmptyState, Tag } from '../../components
 export default function SalesPage() {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { addToast } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     loadSales();
@@ -16,7 +16,7 @@ export default function SalesPage() {
       const data = await getAveroSales();
       setSales(data);
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     } finally {
       setLoading(false);
     }

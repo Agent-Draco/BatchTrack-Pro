@@ -5,7 +5,7 @@ import { DataTable, Button, useToast, Skeleton, EmptyState, Tag } from '../../co
 export default function ReturnsPage() {
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { addToast } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     loadReturns();
@@ -16,7 +16,7 @@ export default function ReturnsPage() {
       const data = await getAveroReturns();
       setReturns(data);
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     } finally {
       setLoading(false);
     }

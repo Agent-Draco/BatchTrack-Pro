@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 export default function DataTable({
   columns = [],
   rows = [],
+  data = [],
   sortable = true,
   className = '',
   emptyTitle = 'No data yet',
@@ -12,10 +13,22 @@ export default function DataTable({
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
 
+  const actualRows = useMemo(() => {
+    return rows && rows.length > 0 ? rows : (data || []);
+  }, [rows, data]);
+
+  const normalizedColumns = useMemo(() => {
+    return columns.map((col) => ({
+      ...col,
+      key: col.key || col.accessor,
+      label: col.label || col.header || col.name || '',
+    }));
+  }, [columns]);
+
   const sortedRows = useMemo(() => {
-    if (!sortKey || !sortable) return rows;
+    if (!sortKey || !sortable) return actualRows;
     const dir = sortDir === 'asc' ? 1 : -1;
-    return [...rows].sort((a, b) => {
+    return [...actualRows].sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
       if (av === bv) return 0;
@@ -24,7 +37,7 @@ export default function DataTable({
       if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
       return String(av).localeCompare(String(bv)) * dir;
     });
-  }, [rows, sortKey, sortDir, sortable]);
+  }, [actualRows, sortKey, sortDir, sortable]);
 
   const handleSort = (key) => {
     if (!sortable) return;
@@ -37,15 +50,15 @@ export default function DataTable({
   };
 
   const renderCell = (col, row, rowIdx) => {
-    if (col.render) return col.render(row[col.key], row, rowIdx);
     const val = row[col.key];
+    if (col.render) return col.render(val, row, rowIdx);
     if (val === null || val === undefined) return '';
     return String(val);
   };
 
   return (
     <div className={`ui-datatable-wrap ${className}`.trim()} {...props}>
-      {rows.length === 0 ? (
+      {actualRows.length === 0 ? (
         <div className="ui-datatable-empty">
           <div className="ui-emptystate">
             <div className="ui-emptystate-icon">📋</div>
@@ -57,7 +70,7 @@ export default function DataTable({
         <table className="ui-datatable">
           <thead>
             <tr>
-              {columns.map((col) => {
+              {normalizedColumns.map((col) => {
                 const canSort = sortable && col.sortable !== false;
                 const isSorted = sortKey === col.key;
                 const thClass = [
@@ -83,7 +96,7 @@ export default function DataTable({
           <tbody>
             {sortedRows.map((row, ri) => (
               <tr key={row.id ?? ri}>
-                {columns.map((col) => (
+                {normalizedColumns.map((col) => (
                   <td key={col.key}>{renderCell(col, row, ri)}</td>
                 ))}
               </tr>
@@ -94,23 +107,3 @@ export default function DataTable({
     </div>
   );
 }
-
-/*
-Example usage:
-  <DataTable
-    columns={[
-      { key: 'name', label: 'Product' },
-      { key: 'price', label: 'Price (₹)', sortable: true },
-      { key: 'expiry', label: 'Expiry', sortable: true },
-      {
-        key: 'status',
-        label: 'Status',
-        render: (v) => <Pill variant={v === 'ok' ? 'green' : 'red'}>{v}</Pill>,
-      },
-    ]}
-    rows={[
-      { id: 1, name: 'Amul Milk', price: 42, expiry: '2026-09-30', status: 'ok' },
-      { id: 2, name: 'Britannia Bread', price: 45, expiry: '2026-09-28', status: 'warn' },
-    ]}
-  />
-*/

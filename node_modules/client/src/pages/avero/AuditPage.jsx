@@ -5,7 +5,7 @@ import { DataTable, useToast, Skeleton, EmptyState } from '../../components/ui/i
 export default function AuditPage() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { addToast } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     loadLogs();
@@ -16,7 +16,7 @@ export default function AuditPage() {
       const data = await getAveroAuditLogs();
       setLogs(data);
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     } finally {
       setLoading(false);
     }

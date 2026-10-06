@@ -8,7 +8,7 @@ export default function PosLoginPage() {
   const [pin, setPin] = useState('');
   const { login } = usePosSession();
   const navigate = useNavigate();
-  const { addToast } = useToast();
+  const toast = useToast();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -16,7 +16,7 @@ export default function PosLoginPage() {
       await login(terminalCode, pin);
       navigate('/pos');
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     }
   };
 

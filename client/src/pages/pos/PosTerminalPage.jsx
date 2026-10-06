@@ -13,7 +13,7 @@ export default function PosTerminalPage() {
   const [paymentAmount, setPaymentAmount] = useState('');
   
   const barcodeRef = useRef(null);
-  const { addToast } = useToast();
+  const toast = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function PosTerminalPage() {
       });
       setBarcode('');
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     }
     barcodeRef.current?.focus();
   };
@@ -48,7 +48,7 @@ export default function PosTerminalPage() {
       const data = await posLookupCustomer(phone);
       setCustomer(data);
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     }
   };
 
@@ -69,7 +69,7 @@ export default function PosTerminalPage() {
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     if (balance > 0) {
-      addToast('Payment incomplete', 'error');
+      toast.push('Payment incomplete', 'error');
       return;
     }
 
@@ -80,7 +80,7 @@ export default function PosTerminalPage() {
         payments,
         issueStoreCredit: change > 0 // Simplified for demo
       });
-      addToast('Sale completed successfully!', 'success');
+      toast.push('Sale completed successfully!', 'success');
       // Reset
       setCart([]);
       setCustomer(null);
@@ -88,7 +88,7 @@ export default function PosTerminalPage() {
       setPayments([]);
       barcodeRef.current?.focus();
     } catch (err) {
-      addToast(err.message, 'error');
+      toast.push(err.message, 'error');
     }
   };
 
