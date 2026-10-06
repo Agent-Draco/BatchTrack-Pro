@@ -1,0 +1,2 @@
+id,return_id,sale_item_id,product_id,batch_id,wadn_id,product_name,sku,qty,return_unit_price,refund_amount,reason,condition,disposition,status,created_at
+eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01,dddddddd-dddd-dddd-dddd-dddddddddd01,aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01,44444444-4444-4444-4444-444444444402,55555555-5555-5555-5555-555555555502,66666666-6666-6666-6666-666666666602,boAt Airdopes 141,SKU-BOAT-AP141,1,1469.00,1469.00,Left earbud not charging,DEFECTIVE,REPAIR,APPROVED,2026-09-29T11:02:00Z

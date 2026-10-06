@@ -1,0 +1,2 @@
+organization_id,sale_prefix,sale_counter,return_prefix,return_counter,refund_prefix,refund_counter,credit_prefix,credit_counter,movement_prefix,movement_counter
+11111111-1111-1111-1111-111111111101,INV,1042,RET,38,REF,25,CCR,87,MOV,312

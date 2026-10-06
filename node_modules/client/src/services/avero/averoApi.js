@@ -1,229 +1,79 @@
-const BASE =
-  typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE
-    ? import.meta.env.VITE_API_BASE
-    : '/api';
+import { supabase } from '../../services/supabase.js';
 
-function getToastFn() {
-  try {
-    const win = typeof window !== 'undefined' ? window : globalThis;
-    if (win.__batchtrackToast) return win.__batchtrackToast;
-  } catch {
-    /* noop */
-  }
-  return {
-    success: () => {},
-    error: (m) => {
-      if (typeof console !== 'undefined') console.error('[Avero API]', m);
-    },
-    info: () => {},
-    push: () => {},
-  };
+async function getAuthHeaders() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ? { 
+    'Authorization': `Bearer ${session.access_token}`,
+    'Content-Type': 'application/json'
+  } : { 'Content-Type': 'application/json' };
 }
 
-function qs(params) {
-  if (!params) return '';
-  const entries = Object.entries(params).filter(
-    ([, v]) => v !== undefined && v !== null && v !== ''
-  );
-  if (entries.length === 0) return '';
-  return (
-    '?' +
-    entries
-      .map(([k, v]) => {
-        const val = Array.isArray(v) ? v.join(',') : String(v);
-        return encodeURIComponent(k) + '=' + encodeURIComponent(val);
-      })
-      .join('&')
-  );
-}
-
-async function request(method, path, body, params) {
-  const url = BASE + path + qs(params);
-  const opts = {
-    method,
-    headers: {
-      Accept: 'application/json',
-    },
-  };
-  if (body !== undefined && body !== null) {
-    if (
-      (typeof FormData !== 'undefined' && body instanceof FormData) ||
-      typeof body === 'string' ||
-      (typeof Blob !== 'undefined' && body instanceof Blob)
-    ) {
-      opts.body = body;
-    } else {
-      opts.headers['Content-Type'] = 'application/json';
-      opts.body = JSON.stringify(body);
-    }
-  }
-
-  let res;
-  try {
-    res = await fetch(url, opts);
-  } catch (err) {
-    const toast = getToastFn();
-    toast.error?.('Network error: could not reach the server.');
-    throw err;
-  }
-
-  let data = null;
-  const text = await res.text();
-  if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = text;
-    }
-  }
-
-  if (!res.ok) {
-    const msg =
-      (data && data.message) ||
-      (data && data.error) ||
-      `Request failed (${res.status})`;
-    const toast = getToastFn();
-    toast.error?.(String(msg));
-    const err = new Error(String(msg));
-    err.status = res.status;
-    err.data = data;
-    throw err;
-  }
-
-  return data;
-}
-
-export const apiGet = (path, params) => request('GET', path, undefined, params);
-export const apiPost = (path, body) => request('POST', path, body);
-export const apiPatch = (path, body) => request('PATCH', path, body);
-
-function safe(call, fallback) {
-  return call.catch((err) => {
-    if (err && err.status && err.status >= 400 && err.status < 500 && !fallback)
-      throw err;
-    if (typeof fallback === 'function') return fallback(err);
-    return fallback === undefined ? Promise.reject(err) : fallback;
+async function apiRequest(endpoint, options = {}) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`/api/avero${endpoint}`, {
+    ...options,
+    headers: { ...headers, ...options.headers }
   });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `API Error: ${response.status}`);
+  }
+  return response.json();
 }
 
-// ==========================================
-// AVERO ENTERPRISE & POS API CLIENT
-// ==========================================
+// Dashboard
+export const getAveroDashboard = () => apiRequest('/dashboard');
 
-export function getAveroDashboard() {
-  return safe(apiGet('/avero/dashboard'), {
-    kpis: {
-      todaySalesINR: 0,
-      totalInventoryValueINR: 0,
-      totalCostValueINR: 0,
-      recoverableSalvageValueINR: 0,
-      activeSkusCount: 0,
-      activeBatchesCount: 0,
-      openReturnsCount: 0,
-      activeTerminalsCount: 0,
-    },
-    attentionItems: [],
-    recentAudits: [],
-    activeTerminals: [],
-  });
-}
+// Products
+export const getAveroProducts = () => apiRequest('/products');
+export const getAveroProduct = (id) => apiRequest(`/products/${id}`);
+export const createAveroProduct = (data) => apiRequest('/products', { method: 'POST', body: JSON.stringify(data) });
+export const updateAveroProduct = (id, data) => apiRequest(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 
-export function getAveroProducts() {
-  return safe(apiGet('/avero/products'), []);
-}
+// Inventory
+export const getAveroInventory = () => apiRequest('/inventory');
+export const getAveroMovements = () => apiRequest('/inventory/movements');
+export const adjustAveroStock = (payload) => apiRequest('/inventory/adjust', { method: 'POST', body: JSON.stringify(payload) });
 
-export function getAveroInventory() {
-  return safe(apiGet('/avero/inventory'), []);
-}
+// Sales
+export const getAveroSales = (filters = '') => apiRequest(`/sales${filters}`);
+export const getAveroSaleDetail = (id) => apiRequest(`/sales/${id}`);
 
-export function getAveroMovements() {
-  return safe(apiGet('/avero/inventory/movements'), []);
-}
+// Returns
+export const getAveroReturns = () => apiRequest('/returns');
+export const createAveroReturn = (payload) => apiRequest('/returns', { method: 'POST', body: JSON.stringify(payload) });
+export const updateAveroItemDisposition = (id, disposition, managerName) => apiRequest(`/returns/items/${id}/disposition`, { method: 'PATCH', body: JSON.stringify({ disposition, managerName }) });
 
-export function adjustAveroStock(payload) {
-  return apiPost('/avero/inventory/adjust', payload);
-}
+// Customers
+export const getAveroCustomers = () => apiRequest('/customers');
+export const getAveroCustomer = (id) => apiRequest(`/customers/${id}`);
+export const createAveroCustomer = (data) => apiRequest('/customers', { method: 'POST', body: JSON.stringify(data) });
 
-export function getAveroSales(filters) {
-  return safe(apiGet('/avero/sales', filters), []);
-}
+// Change Credits
+export const getAveroChangeCredits = () => apiRequest('/change-credits');
+export const getAveroCustomerCredits = (phone) => apiRequest(`/change-credits/customer/${phone}`);
 
-export function getAveroSaleDetail(id) {
-  return safe(apiGet(`/avero/sales/${encodeURIComponent(id)}`), null);
-}
+// Salvage
+export const getAveroSalvage = () => apiRequest('/salvage');
+export const createSalvageTicket = (data) => apiRequest('/salvage/tickets', { method: 'POST', body: JSON.stringify(data) });
+export const updateSalvageTicket = (id, data) => apiRequest(`/salvage/tickets/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 
-export function processAveroCheckout(payload) {
-  return apiPost('/avero/sales/checkout', payload);
-}
+// Terminals
+export const getAveroTerminals = () => apiRequest('/terminals');
+export const getAveroTerminal = (id) => apiRequest(`/terminals/${id}`);
+export const saveAveroTerminal = (data) => apiRequest('/terminals', { method: 'POST', body: JSON.stringify(data) });
 
-export function getAveroChangeCredits() {
-  return safe(apiGet('/avero/change-credits'), []);
-}
+// Audit Logs
+export const getAveroAuditLogs = (filters = '') => apiRequest(`/audit-logs${filters}`);
 
-export function getAveroCustomerCredits(phone) {
-  return safe(apiGet(`/avero/change-credits/${encodeURIComponent(phone)}`), {
-    customerPhone: phone,
-    availableBalance: 0,
-    history: [],
-  });
-}
-
-export function getAveroReturns() {
-  return safe(apiGet('/avero/returns'), []);
-}
-
-export function createAveroReturn(payload) {
-  return apiPost('/avero/returns/create', payload);
-}
-
-export function updateAveroItemDisposition(returnItemId, disposition, managerName) {
-  return apiPatch(`/avero/returns/items/${encodeURIComponent(returnItemId)}/disposition`, {
-    disposition,
-    managerName,
-  });
-}
-
-export function getAveroSalvage() {
-  return safe(apiGet('/avero/salvage'), {
-    attentionItems: [],
-    batches: [],
-    recoverableValue: 0,
-  });
-}
-
-export function getAveroTerminals() {
-  return safe(apiGet('/avero/terminals'), []);
-}
-
-export function verifyAveroTerminal(terminalCode, pin) {
-  return apiPost('/avero/terminals/verify', { terminalCode, pin });
-}
-
-export function saveAveroTerminal(payload) {
-  return apiPost('/avero/terminals/save', payload);
-}
-
-export function getAveroAuditLogs() {
-  return safe(apiGet('/avero/audit-logs'), []);
-}
-
-export default {
-  getAveroDashboard,
-  getAveroProducts,
-  getAveroInventory,
-  getAveroMovements,
-  adjustAveroStock,
-  getAveroSales,
-  getAveroSaleDetail,
-  processAveroCheckout,
-  getAveroChangeCredits,
-  getAveroCustomerCredits,
-  getAveroReturns,
-  createAveroReturn,
-  updateAveroItemDisposition,
-  getAveroSalvage,
-  getAveroTerminals,
-  verifyAveroTerminal,
-  saveAveroTerminal,
-  getAveroAuditLogs,
+// Profile
+export const getProfile = async () => {
+    const headers = await getAuthHeaders();
+    const response = await fetch('/api/auth/profile', { headers });
+    return response.json();
+};
+export const updateProfile = async (data) => {
+    const headers = await getAuthHeaders();
+    const response = await fetch('/api/auth/profile', { method: 'PATCH', headers, body: JSON.stringify(data) });
+    return response.json();
 };

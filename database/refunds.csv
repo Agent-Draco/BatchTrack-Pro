@@ -1,0 +1,2 @@
+id,organization_id,refund_number,return_id,sale_id,customer_id,customer_phone,method,amount,status,reference,provider,original_tender_breakdown,metadata,created_at
+ffffffff-ffff-ffff-ffff-ffffffffff01,11111111-1111-1111-1111-111111111101,REF-AZT-2026-0001,dddddddd-dddd-dddd-dddd-dddddddddd01,99999999-9999-9999-9999-999999999901,33333333-3333-3333-3333-333333333301,+919000000000,UPI,1469.00,COMPLETED,UPI-REF-99881122,manual,"{""original_upi_ref"": ""UPI-RR-9283741829""}","{""gateway_ref"": ""PAY-REV-84729""}",2026-09-29T11:05:00Z

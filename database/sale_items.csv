@@ -1,0 +1,3 @@
+id,sale_id,product_id,batch_id,wadn_id,sku,product_name,brand,category,unit_price,qty,discount,tax_amount,total,returned_qty,status,created_at
+aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01,99999999-9999-9999-9999-999999999901,44444444-4444-4444-4444-444444444402,55555555-5555-5555-5555-555555555502,66666666-6666-6666-6666-666666666602,SKU-BOAT-AP141,boAt Airdopes 141,boAt,Electronics,1499.00,1,0.00,78.00,1577.00,1,RETURNED,2026-09-28T16:05:00Z
+aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa02,99999999-9999-9999-9999-999999999901,44444444-4444-4444-4444-444444444401,55555555-5555-5555-5555-555555555501,,SKU-AMUL-MLK-1L,Amul Taaza Milk 1L,Amul,Dairy & Beverages,42.00,2,0.00,0.00,84.00,0,COMPLETED,2026-09-28T16:05:00Z

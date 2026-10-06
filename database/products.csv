@@ -1,0 +1,4 @@
+id,organization_id,sku,barcode,name,brand,category,unit,base_price,tax_rate,is_serialized,min_stock_threshold,is_active,metadata,created_at,updated_at
+44444444-4444-4444-4444-444444444401,11111111-1111-1111-1111-111111111101,SKU-AMUL-MLK-1L,8901262010014,Amul Taaza Milk 1L,Amul,Dairy & Beverages,litre,42.00,0.00,false,20,true,"{""hsn"": ""0401"", ""perishable"": true}",2026-01-20T10:00:00Z,2026-09-29T10:00:00Z
+44444444-4444-4444-4444-444444444402,11111111-1111-1111-1111-111111111101,SKU-BOAT-AP141,8904123514101,boAt Airdopes 141,boAt,Electronics,piece,1499.00,18.00,true,5,true,"{""hsn"": ""8518"", ""warranty_months"": 12}",2026-01-20T10:15:00Z,2026-09-29T10:00:00Z
+44444444-4444-4444-4444-444444444403,11111111-1111-1111-1111-111111111101,SKU-TATA-SALT-1K,8901030010011,Tata Salt 1kg,Tata,Groceries & Staples,kg,30.00,5.00,false,50,true,"{""hsn"": ""2501"", ""iodized"": true}",2026-01-20T10:30:00Z,2026-09-29T10:00:00Z
